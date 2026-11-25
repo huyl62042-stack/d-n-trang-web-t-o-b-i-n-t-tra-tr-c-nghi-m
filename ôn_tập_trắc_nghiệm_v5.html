@@ -1,0 +1,3031 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#1e293b" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+
+  <!-- =========================================================================
+       TƯỜNG LỬA BẢO MẬT CẤP TRÌNH DUYỆT (CONTENT SECURITY POLICY)
+       Chặn 100% rò rỉ dữ liệu ra bên ngoài, chỉ cho phép duy nhất cổng Google Gemini & thư viện đọc DOCX/PDF
+       Tương thích hoàn toàn với Safari (iOS/macOS), Google App & Chrome trên iPhone
+       ========================================================================= -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net blob:; worker-src 'self' blob: https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://generativelanguage.googleapis.com https://cdn.jsdelivr.net blob: data:; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'none';" />
+  <meta http-equiv="X-Content-Type-Options" content="nosniff" />
+  <meta name="referrer" content="no-referrer" />
+
+  <title>Ôn Tập Trắc Nghiệm Thông Minh — Đọc DOCX &amp; PDF (iPhone/Safari/PC)</title>
+  <!-- Thư viện JSZip & PDF.js (kèm cơ chế giải nén phần cứng DecompressionStream khi offline) -->
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js" defer></script>
+  <style>
+    /* ======================= CSS RESET & FOUNDATION ======================= */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg-main: #f8fafc; --bg-card: #ffffff; --bg-card-alt: #f1f5f9;
+      --bg-hover: #e2e8f0; --bg-input: #f8fafc;
+      --border: #e2e8f0; --border-light: #f1f5f9;
+      --text-primary: #0f172a; --text-secondary: #475569; --text-muted: #94a3b8;
+      --accent: #3b82f6; --accent-hover: #2563eb; --accent-light: #dbeafe; --accent-bg: #eff6ff;
+      --success: #10b981; --success-light: #d1fae5; --success-bg: #ecfdf5;
+      --danger: #ef4444; --danger-light: #fee2e2; --danger-bg: #fef2f2;
+      --warning: #f59e0b; --warning-light: #fef3c7; --warning-bg: #fffbeb;
+      --indigo: #6366f1; --indigo-light: #e0e7ff;
+      --radius-sm: 8px; --radius-md: 12px; --radius-lg: 16px; --radius-xl: 20px; --radius-full: 9999px;
+      --shadow-sm: 0 1px 3px rgba(15,23,42,.06), 0 1px 2px rgba(15,23,42,.04);
+      --shadow-md: 0 4px 16px rgba(15,23,42,.07), 0 2px 4px rgba(15,23,42,.04);
+      --shadow-lg: 0 10px 30px rgba(15,23,42,.1), 0 4px 10px rgba(15,23,42,.05);
+      --font: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      --transition: 0.18s ease;
+    }
+
+    html.dark {
+      --bg-main: #0f172a; --bg-card: #1e293b; --bg-card-alt: #1e293b;
+      --bg-hover: #334155; --bg-input: #1e293b;
+      --border: #334155; --border-light: #1e293b;
+      --text-primary: #f1f5f9; --text-secondary: #94a3b8; --text-muted: #64748b;
+      --accent-light: #1e3a5f; --accent-bg: #172554;
+      --success-light: #064e3b; --success-bg: #022c22;
+      --danger-light: #7f1d1d; --danger-bg: #450a0a;
+      --warning-light: #78350f; --warning-bg: #451a03;
+      --indigo-light: #312e81;
+      --shadow-sm: 0 1px 3px rgba(0,0,0,.3); --shadow-md: 0 4px 16px rgba(0,0,0,.35);
+      --shadow-lg: 0 10px 30px rgba(0,0,0,.45);
+    }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg-main);
+      color: var(--text-primary);
+      min-height: 100vh;
+      min-height: 100dvh;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    ::selection { background: var(--accent); color: #fff; }
+
+    /* Scrollbar tinh gọn */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: var(--radius-full); opacity: .5; }
+    ::-webkit-scrollbar-thumb:hover { opacity: .8; }
+
+    /* ======================= UTILITY CLASSES ======================= */
+    .hidden { display: none !important; }
+    .flex { display: flex; }
+    .flex-col { flex-direction: column; }
+    .items-center { align-items: center; }
+    .justify-between { justify-content: space-between; }
+    .justify-center { justify-content: center; }
+    .gap-1 { gap: 4px; } .gap-2 { gap: 8px; } .gap-3 { gap: 12px; } .gap-4 { gap: 16px; }
+    .flex-1 { flex: 1; }
+    .flex-wrap { flex-wrap: wrap; }
+    .shrink-0 { flex-shrink: 0; }
+    .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .w-full { width: 100%; }
+    .text-xs { font-size: 12px; line-height: 1.5; }
+    .text-sm { font-size: 14px; line-height: 1.6; }
+    .text-base { font-size: 16px; line-height: 1.6; }
+    .text-lg { font-size: 18px; line-height: 1.7; }
+    .text-xl { font-size: 20px; }
+    .text-2xl { font-size: 24px; }
+    .text-3xl { font-size: 30px; }
+    .font-medium { font-weight: 500; }
+    .font-semibold { font-weight: 600; }
+    .font-bold { font-weight: 700; }
+    .font-extrabold { font-weight: 800; }
+    .leading-relaxed { line-height: 1.75; }
+    .text-center { text-align: center; }
+    .select-none { user-select: none; }
+    .cursor-pointer { cursor: pointer; }
+    .pointer-events-none { pointer-events: none; }
+    .relative { position: relative; }
+    .absolute { position: absolute; }
+    .overflow-hidden { overflow: hidden; }
+    .overflow-y-auto { overflow-y: auto; }
+    .transition-all { transition: all var(--transition); }
+
+    /* ======================= HEADER ======================= */
+    /* Hỗ trợ input file ẩn chuẩn iOS Safari / Google App (không dùng display:none vì iOS chặn mở trình chọn Tệp) */
+    .ios-file-input-hidden {
+      position: absolute !important;
+      width: 1px !important;
+      height: 1px !important;
+      padding: 0 !important;
+      margin: -1px !important;
+      overflow: hidden !important;
+      clip: rect(0, 0, 0, 0) !important;
+      white-space: nowrap !important;
+      border: 0 !important;
+      opacity: 0 !important;
+      pointer-events: none !important;
+    }
+    .app-header {
+      position: sticky; top: 0; z-index: 40;
+      background: rgba(255,255,255,.94);
+      -webkit-backdrop-filter: blur(16px) saturate(1.4);
+      backdrop-filter: blur(16px) saturate(1.4);
+      border-bottom: 1px solid var(--border);
+      padding: 0 16px; height: 56px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    html.dark .app-header { background: rgba(15,23,42,.94); }
+
+    .header-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
+    .header-logo {
+      width: 36px; height: 36px; border-radius: var(--radius-md);
+      background: linear-gradient(135deg, var(--accent) 0%, var(--indigo) 100%);
+      color: #fff; display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; box-shadow: var(--shadow-sm);
+    }
+    .header-title { font-size: 14px; font-weight: 700; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .header-subtitle { font-size: 11px; color: var(--text-muted); display: none; }
+    @media (min-width: 640px) { .header-subtitle { display: block; } }
+
+    .header-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+
+    /* ======================= BUTTONS ======================= */
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+      padding: 8px 14px; border-radius: var(--radius-md);
+      font-size: 12px; font-weight: 600; border: 1px solid transparent;
+      cursor: pointer; transition: all var(--transition);
+      outline: none; text-decoration: none; white-space: nowrap;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn:active { transform: scale(0.97); }
+    .btn:focus-visible { box-shadow: 0 0 0 3px rgba(59,130,246,.35); }
+
+    .btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .btn-primary:hover { background: var(--accent-hover); }
+
+    .btn-secondary { background: var(--bg-card-alt); color: var(--text-secondary); border-color: var(--border); }
+    .btn-secondary:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+    .btn-ghost { background: transparent; color: var(--text-secondary); }
+    .btn-ghost:hover { background: var(--bg-card-alt); color: var(--text-primary); }
+
+    .btn-danger { background: transparent; color: var(--text-secondary); border-color: var(--border); }
+    .btn-danger:hover { background: var(--danger-bg); color: var(--danger); border-color: var(--danger); }
+
+    .btn-success { background: var(--success-bg); color: var(--success); border-color: var(--success); }
+    .btn-success:hover { background: var(--success); color: #fff; }
+
+    .btn-sm { padding: 6px 10px; font-size: 11px; border-radius: var(--radius-sm); }
+    .btn-icon { padding: 8px; width: 36px; height: 36px; }
+
+    .badge {
+      display: inline-flex; align-items: center; justify-content: center;
+      padding: 2px 10px; border-radius: var(--radius-full);
+      font-size: 11px; font-weight: 700; white-space: nowrap;
+    }
+
+    /* ======================= MODE SWITCH ======================= */
+    .mode-switch {
+      display: inline-flex; border-radius: var(--radius-md);
+      background: var(--bg-card-alt); padding: 3px; border: 1px solid var(--border);
+    }
+    .mode-switch button {
+      padding: 5px 12px; border-radius: 9px; font-size: 11px; font-weight: 600;
+      border: none; cursor: pointer; transition: all var(--transition);
+      background: transparent; color: var(--text-muted);
+    }
+    .mode-switch button.active { background: var(--accent); color: #fff; box-shadow: var(--shadow-sm); }
+    .mode-switch button:not(.active):hover { color: var(--text-primary); }
+
+    /* ======================= PROGRESS BAR ======================= */
+    .progress-top-bar {
+      position: fixed; top: 56px; left: 0; right: 0; height: 3px; z-index: 39;
+      background: var(--border);
+    }
+    .progress-top-fill {
+      height: 100%; background: linear-gradient(90deg, var(--accent), var(--indigo), var(--success));
+      border-radius: 0 2px 2px 0; transition: width 0.4s cubic-bezier(.4,0,.2,1);
+      min-width: 0;
+    }
+
+    /* ======================= MAIN LAYOUT ======================= */
+    .app-container {
+      max-width: 1280px; margin: 0 auto; padding: 16px;
+    }
+
+    .screen { display: none; }
+    .screen.active { display: block; }
+
+    /* ======================= VAULT LOCK SCREEN ======================= */
+    .vault-lock-box {
+      max-width: 440px; margin: 60px auto; padding: 36px 24px;
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius-xl); box-shadow: var(--shadow-lg);
+      text-align: center;
+    }
+    .vault-icon-wrap {
+      width: 72px; height: 72px; margin: 0 auto 16px; border-radius: 24px;
+      background: linear-gradient(135deg, rgba(16,185,129,.15), rgba(59,130,246,.15));
+      display: flex; align-items: center; justify-content: center; color: var(--success);
+    }
+
+    /* ======================= UPLOAD SCREEN ======================= */
+    .upload-hero {
+      text-align: center; padding: 36px 16px 20px;
+    }
+    .upload-hero-icon {
+      width: 68px; height: 68px; margin: 0 auto 16px; border-radius: 20px;
+      background: linear-gradient(135deg, var(--accent-bg), var(--indigo-light));
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: var(--shadow-sm);
+    }
+    .upload-hero h2 { font-size: 22px; font-weight: 800; margin-bottom: 8px; }
+    .upload-hero p { font-size: 13px; color: var(--text-secondary); max-width: 500px; margin: 0 auto; }
+
+    .dropzone {
+      margin: 20px auto; max-width: 560px; padding: 32px 20px;
+      border: 2px dashed var(--border); border-radius: var(--radius-xl);
+      background: var(--bg-card); cursor: pointer; transition: all var(--transition);
+      text-align: center;
+    }
+    .dropzone:hover, .dropzone.active { border-color: var(--accent); background: var(--accent-bg); }
+    .dropzone-icon {
+      width: 48px; height: 48px; margin: 0 auto 12px; border-radius: var(--radius-md);
+      background: var(--accent-light); color: var(--accent);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .dropzone-title { font-size: 14px; font-weight: 600; }
+    .dropzone-desc { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+
+    .upload-progress-bar {
+      max-width: 560px; margin: 16px auto 0;
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); padding: 14px 16px;
+    }
+    .upload-progress-track {
+      width: 100%; height: 6px; border-radius: var(--radius-full);
+      background: var(--bg-card-alt); overflow: hidden; margin-top: 8px;
+    }
+    .upload-progress-fill {
+      height: 100%; border-radius: var(--radius-full);
+      background: linear-gradient(90deg, var(--accent), var(--indigo), var(--success));
+      transition: width 0.2s ease; width: 0%;
+    }
+
+    .loaded-files { max-width: 560px; margin: 16px auto 0; display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+    .loaded-file-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 6px 12px; border-radius: var(--radius-md);
+      background: var(--success-bg); color: var(--success);
+      border: 1px solid var(--success-light); font-size: 12px; font-weight: 600;
+    }
+    .upload-options {
+      max-width: 560px; margin: 20px auto 0;
+      display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap;
+    }
+    .upload-start-btn {
+      margin: 20px auto 0; display: flex; align-items: center; justify-content: center; gap: 8px;
+      padding: 14px 32px; font-size: 15px; font-weight: 700;
+      border-radius: var(--radius-lg); background: var(--accent); color: #fff;
+      border: none; cursor: pointer; box-shadow: var(--shadow-md);
+      transition: all var(--transition);
+    }
+    .upload-start-btn:hover { background: var(--accent-hover); transform: translateY(-1px); box-shadow: var(--shadow-lg); }
+
+    /* ======================= STUDY SCREEN ======================= */
+    .study-layout {
+      display: grid; grid-template-columns: 1fr; gap: 16px;
+    }
+    @media (min-width: 1024px) {
+      .study-layout { grid-template-columns: 1fr 320px; gap: 20px; }
+    }
+
+    .card {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius-xl); padding: 20px; box-shadow: var(--shadow-sm);
+    }
+
+    /* Question Card */
+    .question-header {
+      display: flex; align-items: center; justify-content: space-between;
+      flex-wrap: wrap; gap: 8px; padding-bottom: 14px;
+      border-bottom: 1px solid var(--border-light);
+    }
+    .question-badges { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+
+    .question-body {
+      margin-top: 18px; font-size: 16px; font-weight: 600; line-height: 1.75;
+      color: var(--text-primary);
+    }
+    @media (min-width: 640px) { .question-body { font-size: 17px; } }
+
+    /* Option Cards */
+    .options-list { margin-top: 18px; display: flex; flex-direction: column; gap: 10px; }
+
+    .option-card {
+      width: 100%; text-align: left; padding: 14px 16px;
+      border-radius: var(--radius-lg); border: 2px solid var(--border);
+      background: var(--bg-card); cursor: pointer;
+      display: flex; align-items: flex-start; gap: 12px;
+      transition: all var(--transition); position: relative;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .option-card:hover:not(.answered) {
+      border-color: var(--accent); background: var(--accent-bg);
+      transform: translateY(-1px); box-shadow: var(--shadow-sm);
+    }
+    .option-card:active:not(.answered) { transform: scale(0.995); }
+    .option-card.correct {
+      border-color: var(--success); background: var(--success-bg);
+      box-shadow: 0 0 0 1px var(--success), inset 0 0 0 1px rgba(16,185,129,.1);
+    }
+    .option-card.wrong {
+      border-color: var(--danger); background: var(--danger-bg);
+      box-shadow: 0 0 0 1px var(--danger), inset 0 0 0 1px rgba(239,68,68,.1);
+    }
+    .option-card.dimmed { opacity: .6; border-color: var(--border-light); }
+
+    .option-letter {
+      width: 32px; height: 32px; border-radius: var(--radius-sm);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 700; flex-shrink: 0;
+      background: var(--bg-card-alt); color: var(--text-secondary);
+      border: 1px solid var(--border); transition: all var(--transition);
+    }
+    .option-card.correct .option-letter { background: var(--success); color: #fff; border-color: var(--success); }
+    .option-card.wrong .option-letter { background: var(--danger); color: #fff; border-color: var(--danger); }
+
+    .option-text { font-size: 14px; font-weight: 500; line-height: 1.65; flex: 1; padding-top: 4px; }
+    .option-tag {
+      font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: var(--radius-full);
+      flex-shrink: 0; margin-top: 4px;
+    }
+    .option-tag.correct-tag { background: var(--success-light); color: var(--success); }
+    .option-tag.wrong-tag { background: var(--danger-light); color: var(--danger); }
+
+    /* Explanation Box */
+    .explanation-box {
+      margin-top: 18px; padding: 16px; border-radius: var(--radius-lg);
+      background: var(--bg-card-alt); border: 1px solid var(--border);
+    }
+    .explanation-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+    .explanation-answer { font-size: 14px; font-weight: 700; color: var(--success); }
+    .explanation-text { margin-top: 10px; font-size: 13px; line-height: 1.75; color: var(--text-secondary); }
+
+    /* Navigation Bar */
+    .nav-bar {
+      margin-top: 18px; padding-top: 16px;
+      border-top: 1px solid var(--border-light);
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    }
+    @media (max-width: 1023px) {
+      .nav-bar-mobile {
+        position: fixed; bottom: 0; left: 0; right: 0; z-index: 35;
+        background: var(--bg-card); border-top: 1px solid var(--border);
+        padding: 10px 16px; display: flex; align-items: center; justify-content: space-between; gap: 8px;
+        box-shadow: 0 -4px 16px rgba(15,23,42,.08);
+        padding-bottom: max(10px, env(safe-area-inset-bottom));
+      }
+      html.dark .nav-bar-mobile { box-shadow: 0 -4px 16px rgba(0,0,0,.35); }
+      body { padding-bottom: 68px; }
+    }
+    @media (min-width: 1024px) {
+      .nav-bar-mobile { display: none !important; }
+    }
+
+    .nav-center { display: flex; align-items: center; gap: 6px; }
+
+    /* Keyboard Shortcuts Hint */
+    .shortcuts-hint {
+      margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--border);
+      display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+      font-size: 11px; color: var(--text-muted);
+    }
+    .shortcuts-hint kbd {
+      display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 10px;
+      background: var(--bg-card); border: 1px solid var(--border);
+      font-weight: 600; color: var(--text-secondary);
+    }
+
+    /* ======================= SIDEBAR: MATRIX + STATS ======================= */
+    .sidebar { display: flex; flex-direction: column; gap: 16px; }
+    @media (min-width: 1024px) {
+      .sidebar { position: sticky; top: 76px; max-height: calc(100dvh - 90px); overflow-y: auto; }
+    }
+
+    /* Stats Mini Cards */
+    .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .stat-card {
+      padding: 12px; border-radius: var(--radius-md);
+      background: var(--bg-card); border: 1px solid var(--border);
+    }
+    .stat-label { font-size: 11px; color: var(--text-muted); font-weight: 500; }
+    .stat-value { font-size: 22px; font-weight: 800; margin-top: 2px; }
+    .stat-sub { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+    .stat-correct .stat-value { color: var(--success); }
+    .stat-wrong .stat-value { color: var(--danger); }
+    .stat-starred .stat-value { color: var(--warning); }
+    .stat-progress .stat-value { color: var(--accent); }
+
+    /* Matrix Grid */
+    .matrix-card { }
+    .matrix-header { display: flex; align-items: center; justify-content: space-between; padding-bottom: 10px; border-bottom: 1px solid var(--border-light); }
+    .matrix-filter-tabs { display: flex; gap: 4px; margin-top: 10px; flex-wrap: wrap; }
+    .matrix-filter-tab {
+      padding: 4px 10px; border-radius: var(--radius-full); font-size: 11px; font-weight: 600;
+      border: 1px solid var(--border); background: var(--bg-card);
+      cursor: pointer; transition: all var(--transition); color: var(--text-muted);
+    }
+    .matrix-filter-tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .matrix-filter-tab:hover:not(.active) { background: var(--bg-card-alt); color: var(--text-primary); }
+
+    .matrix-legend {
+      margin-top: 10px; display: flex; flex-wrap: wrap; gap: 10px; font-size: 11px; color: var(--text-muted);
+    }
+    .matrix-legend-dot { width: 10px; height: 10px; border-radius: 3px; display: inline-block; margin-right: 4px; }
+
+    .matrix-grid {
+      margin-top: 10px; display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px;
+      max-height: 320px; overflow-y: auto; padding-right: 2px;
+    }
+    @media (min-width: 1024px) { .matrix-grid { grid-template-columns: repeat(7, 1fr); } }
+
+    .matrix-btn {
+      height: 32px; border-radius: var(--radius-sm); border: 1px solid var(--border);
+      font-size: 11px; font-weight: 600; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: all var(--transition); background: var(--bg-card-alt); color: var(--text-secondary);
+    }
+    .matrix-btn:hover { background: var(--bg-hover); }
+    .matrix-btn.current { background: var(--accent); color: #fff; border-color: var(--accent); box-shadow: 0 0 0 2px rgba(59,130,246,.3); }
+    .matrix-btn.q-correct { background: var(--success-bg); color: var(--success); border-color: var(--success); }
+    .matrix-btn.q-wrong { background: var(--danger-bg); color: var(--danger); border-color: var(--danger); }
+    .matrix-btn.q-starred { background: var(--warning-bg); color: var(--warning); border-color: var(--warning); }
+
+    /* Tool buttons in sidebar */
+    .sidebar-tools {
+      display: flex; gap: 6px; flex-wrap: wrap;
+    }
+
+    /* ======================= AI DRAWER ======================= */
+    .ai-drawer-overlay {
+      position: fixed; inset: 0; z-index: 50;
+      background: rgba(15,23,42,.4);
+      -webkit-backdrop-filter: blur(4px);
+      backdrop-filter: blur(4px);
+      opacity: 0; pointer-events: none; transition: opacity 0.25s ease;
+    }
+    .ai-drawer-overlay.open { opacity: 1; pointer-events: auto; }
+
+    .ai-drawer {
+      position: fixed; top: 0; right: 0; bottom: 0; z-index: 51;
+      width: min(420px, 92vw); background: var(--bg-card);
+      border-left: 1px solid var(--border); box-shadow: var(--shadow-lg);
+      transform: translateX(100%); transition: transform 0.3s cubic-bezier(.4,0,.2,1);
+      display: flex; flex-direction: column;
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+    .ai-drawer.open { transform: translateX(0); }
+
+    .ai-drawer-header {
+      padding: 16px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .ai-drawer-header-left { display: flex; align-items: center; gap: 10px; }
+    .ai-icon-wrap {
+      width: 36px; height: 36px; border-radius: var(--radius-md);
+      background: linear-gradient(135deg, var(--indigo), #9333ea);
+      color: #fff; display: flex; align-items: center; justify-content: center;
+    }
+
+    .ai-quick-prompts { padding: 10px 16px; display: flex; gap: 6px; flex-wrap: wrap; border-bottom: 1px solid var(--border-light); }
+    .ai-quick-btn {
+      padding: 5px 12px; border-radius: var(--radius-full); font-size: 11px; font-weight: 600;
+      border: 1px solid var(--border); background: var(--bg-card-alt); color: var(--text-secondary);
+      cursor: pointer; transition: all var(--transition);
+    }
+    .ai-quick-btn:first-child { background: var(--indigo-light); color: var(--indigo); border-color: var(--indigo); }
+    .ai-quick-btn:hover { background: var(--bg-hover); }
+
+    .ai-messages { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+    .ai-msg {
+      padding: 12px 14px; border-radius: var(--radius-lg); font-size: 13px; line-height: 1.7;
+      max-width: 90%; word-wrap: break-word;
+    }
+    .ai-msg.user-msg {
+      align-self: flex-end; background: var(--accent); color: #fff; border-bottom-right-radius: 4px;
+    }
+    .ai-msg.bot-msg {
+      align-self: flex-start; background: var(--bg-card-alt); border: 1px solid var(--border);
+      color: var(--text-secondary); border-bottom-left-radius: 4px;
+    }
+    .ai-msg-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 4px; opacity: .7; }
+
+    .ai-input-bar {
+      padding: 12px 16px; border-top: 1px solid var(--border);
+      display: flex; gap: 8px;
+    }
+    .ai-input {
+      flex: 1; padding: 10px 14px; border-radius: var(--radius-md);
+      border: 1px solid var(--border); background: var(--bg-input);
+      font-size: 13px; color: var(--text-primary); outline: none;
+      font-family: var(--font);
+    }
+    .ai-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(59,130,246,.12); }
+    .ai-input::placeholder { color: var(--text-muted); }
+
+    /* ======================= FILTER / SEARCH BAR ======================= */
+    .filter-bar {
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+    .filter-chips { display: flex; gap: 4px; flex-wrap: wrap; flex: 1; min-width: 0; }
+    .filter-chip {
+      padding: 6px 14px; border-radius: var(--radius-full); font-size: 12px; font-weight: 600;
+      border: 1px solid var(--border); background: var(--bg-card);
+      cursor: pointer; transition: all var(--transition); color: var(--text-muted); white-space: nowrap;
+    }
+    .filter-chip.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .filter-chip:hover:not(.active) { background: var(--bg-card-alt); color: var(--text-primary); }
+
+    .search-wrap {
+      position: relative; width: 220px; flex-shrink: 0;
+    }
+    .search-input {
+      width: 100%; padding: 8px 12px 8px 34px; border-radius: var(--radius-md);
+      border: 1px solid var(--border); background: var(--bg-input);
+      font-size: 12px; color: var(--text-primary); outline: none;
+      font-family: var(--font);
+    }
+    .search-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(59,130,246,.12); }
+    .search-input::placeholder { color: var(--text-muted); }
+    .search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text-muted); }
+
+    @media (max-width: 639px) {
+      .search-wrap { width: 100%; }
+    }
+
+    /* ======================= MODAL ======================= */
+    .modal-overlay {
+      position: fixed; inset: 0; z-index: 60;
+      background: rgba(15,23,42,.5);
+      -webkit-backdrop-filter: blur(4px);
+      backdrop-filter: blur(4px);
+      display: none; align-items: center; justify-content: center; padding: 16px;
+    }
+
+    /* Tối ưu cho iPhone (Safari & Google App): font-size >= 16px trên input ở màn hình nhỏ để chống Safari tự động phóng to (auto-zoom) làm lệch giao diện */
+    @media (max-width: 767px) {
+      .search-input, .ai-input, .modal-input {
+        font-size: 16px !important;
+      }
+      .dropzone, .btn, .option-card {
+        touch-action: manipulation;
+      }
+    }
+    .modal-overlay.open { display: flex; }
+    .modal-box {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius-xl); max-width: 480px; width: 100%;
+      padding: 24px; box-shadow: var(--shadow-lg); max-height: 90vh; overflow-y: auto;
+    }
+    .modal-header { display: flex; align-items: center; justify-content: space-between; padding-bottom: 12px; border-bottom: 1px solid var(--border-light); }
+    .modal-header h3 { font-size: 16px; font-weight: 700; }
+    .modal-close { background: none; border: none; cursor: pointer; color: var(--text-muted); font-size: 18px; padding: 4px; }
+    .modal-body { margin-top: 16px; }
+    .modal-label { font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px; display: block; }
+    .modal-input {
+      width: 100%; padding: 10px 14px; border-radius: var(--radius-md);
+      border: 1px solid var(--border); background: var(--bg-input);
+      font-size: 13px; color: var(--text-primary); outline: none;
+      font-family: var(--font);
+    }
+    .modal-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(59,130,246,.12); }
+    .modal-footer { margin-top: 16px; display: flex; gap: 8px; justify-content: flex-end; }
+
+    /* Security Modal Specific Styles */
+    .sec-status-row {
+      display: flex; align-items: flex-start; gap: 12px; padding: 12px;
+      border-radius: var(--radius-md); background: var(--bg-card-alt);
+      border: 1px solid var(--border); margin-bottom: 10px;
+    }
+    .sec-status-icon {
+      width: 32px; height: 32px; border-radius: 8px; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center; font-size: 16px;
+    }
+    .sec-status-title { font-size: 13px; font-weight: 700; color: var(--text-primary); }
+    .sec-status-desc { font-size: 11px; color: var(--text-secondary); margin-top: 2px; line-height: 1.5; }
+    .sec-log-box {
+      margin-top: 10px; max-height: 120px; overflow-y: auto; padding: 8px;
+      background: var(--bg-input); border-radius: var(--radius-sm); border: 1px solid var(--border);
+      font-family: monospace; font-size: 11px; line-height: 1.6; color: var(--text-secondary);
+    }
+
+    /* ======================= TOAST ======================= */
+    .toast-container {
+      position: fixed; bottom: 80px; right: 16px; z-index: 70;
+      display: flex; flex-direction: column; gap: 8px; max-width: 340px;
+      pointer-events: none;
+    }
+    @media (min-width: 1024px) { .toast-container { bottom: 24px; } }
+    .toast {
+      padding: 10px 16px; border-radius: var(--radius-md);
+      font-size: 13px; font-weight: 500; box-shadow: var(--shadow-md);
+      pointer-events: auto; animation: toastIn .25s ease-out;
+    }
+    .toast-info { background: #1e293b; color: #f1f5f9; }
+    html.dark .toast-info { background: #e2e8f0; color: #1e293b; }
+    .toast-success { background: var(--success); color: #fff; }
+    .toast-warning { background: var(--warning); color: #fff; }
+    .toast-error { background: var(--danger); color: #fff; }
+
+    @keyframes toastIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes fadeSlideIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+    .animate-in { animation: fadeSlideIn .22s ease-out; }
+
+    .checkbox-wrap {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 12px; font-weight: 500; color: var(--text-secondary);
+      cursor: pointer; user-select: none;
+    }
+    .checkbox-wrap input[type="checkbox"] {
+      width: 16px; height: 16px; border-radius: 4px;
+      accent-color: var(--accent); cursor: pointer;
+    }
+
+    .swipe-hint {
+      text-align: center; font-size: 11px; color: var(--text-muted);
+      padding: 8px 0; display: none;
+    }
+    @media (max-width: 1023px) and (pointer: coarse) {
+      .swipe-hint { display: block; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Toast Container -->
+  <div id="toastContainer" class="toast-container"></div>
+
+  <!-- ===== HEADER ===== -->
+  <header class="app-header">
+    <div class="header-left">
+      <div class="header-logo">
+        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25"/></svg>
+      </div>
+      <div style="min-width:0">
+        <div id="headerTitle" class="header-title">Ôn Tập Trắc Nghiệm Thông Minh</div>
+        <div id="headerSubtitle" class="header-subtitle">Nạp .docx → Tự động tạo đề &amp; làm bài offline</div>
+      </div>
+    </div>
+    <div class="header-actions">
+      <!-- Screen Nav -->
+      <div class="mode-switch" id="screenNav">
+        <button id="navUpload" class="active" title="Nạp đề">📄 Nạp đề</button>
+        <button id="navStudy" title="Làm bài">✏️ Làm bài</button>
+      </div>
+      <!-- Quiz/Study Mode -->
+      <div class="mode-switch" id="studyModeSwitch" style="display:none">
+        <button id="btnModeQuiz" class="active">Làm bài</button>
+        <button id="btnModeStudy">Học nhanh</button>
+      </div>
+      <!-- AI -->
+      <button id="btnOpenAI" class="btn btn-secondary btn-sm" title="Trợ lý AI">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/></svg>
+        <span id="aiStatusLabel">AI</span>
+      </button>
+      <!-- Security Center Button -->
+      <button id="btnOpenSecurity" class="btn btn-secondary btn-sm" title="Trung tâm Tường lửa &amp; Bảo mật dữ liệu" style="gap:5px;border-color:rgba(16,185,129,0.4);color:var(--success);">
+        <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z"/></svg>
+        <span id="securityBadgeLabel">Tường Lửa: Bật</span>
+      </button>
+      <!-- Settings -->
+      <button id="btnOpenApiModal" class="btn btn-ghost btn-icon" title="Cấu hình API Key">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><circle cx="12" cy="12" r="3"/></svg>
+      </button>
+      <!-- Theme Toggle -->
+      <button id="btnToggleTheme" class="btn btn-ghost btn-icon" title="Sáng / Tối">
+        <svg id="iconSun" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="display:none"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+        <svg id="iconMoon" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- Progress Bar (Instagram Stories style) -->
+  <div class="progress-top-bar"><div id="topProgressFill" class="progress-top-fill" style="width:0%"></div></div>
+
+  <!-- ===== MAIN CONTENT ===== -->
+  <main class="app-container">
+
+    <!-- ============ SCREEN 0: VAULT LOCKED (Màn hình mở khóa két sắt) ============ -->
+    <div id="screenVaultLock" class="screen">
+      <div class="vault-lock-box animate-in">
+        <div class="vault-icon-wrap">
+          <svg width="36" height="36" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"/></svg>
+        </div>
+        <h2 style="font-size:18px;font-weight:800;color:var(--text-primary);margin-bottom:6px;">Két Sắt Dữ Liệu Đang Khóa</h2>
+        <p style="font-size:13px;color:var(--text-secondary);line-height:1.6;margin-bottom:18px;">
+          Toàn bộ ngân hàng đề thi và cấu hình được bảo vệ bằng chuẩn mã hóa quân sự <strong style="color:var(--success)">AES-GCM 256-bit</strong>. Vui lòng nhập Mã PIN / Mật khẩu để mở khóa.
+        </p>
+        <form id="vaultUnlockForm" style="display:flex;flex-direction:column;gap:10px;">
+          <input id="vaultUnlockPin" type="password" placeholder="Nhập mã PIN hoặc mật khẩu..." class="modal-input" style="text-align:center;font-size:15px;letter-spacing:2px;" autocomplete="current-password" autofocus />
+          <button id="btnVaultUnlock" type="submit" class="btn btn-primary" style="padding:12px;font-size:14px;font-weight:700;">
+            🔓 Mở Khóa Dữ Liệu
+          </button>
+        </form>
+        <div style="margin-top:16px;padding-top:14px;border-top:1px dashed var(--border);font-size:11px;color:var(--text-muted);">
+          Không có mã PIN, không bất cứ ai hay phần mềm nào có thể đọc trộm dữ liệu trong máy tính của bạn.
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ SCREEN 1: UPLOAD ============ -->
+    <div id="screenUpload" class="screen active">
+      <div class="upload-hero">
+        <div class="upload-hero-icon">
+          <svg width="32" height="32" fill="none" stroke="var(--accent)" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+        </div>
+        <h2>Nạp Tài Liệu Word (.docx) hoặc PDF (.pdf)</h2>
+        <p>Chạm chọn tệp hoặc kéo thả file <strong>.docx / .pdf</strong> vào bên dưới. Hệ thống tự động lọc rác quảng cáo, bóc tách câu hỏi &amp; đáp án và khởi chạy bộ đề ngay lập tức trên cả iPhone (Safari / Google) lẫn Máy tính.</p>
+      </div>
+
+      <input id="docxFileInput" class="ios-file-input-hidden" type="file" accept=".docx,.pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/pdf,application/msword,application/zip,application/octet-stream" multiple />
+      <label for="docxFileInput" id="docxDropzone" class="dropzone" style="display:block;position:relative;">
+        <div class="dropzone-icon">
+          <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+        </div>
+        <div class="dropzone-title">Chạm hoặc kéo thả file <strong style="color:var(--accent)">.docx / .pdf</strong> vào đây</div>
+        <div class="dropzone-desc">Tương thích 100% iPhone (Safari / Google), Android &amp; Máy tính • Bóc tách siêu tốc</div>
+      </label>
+
+      <div id="uploadStatusSection" class="upload-progress-bar hidden">
+        <div style="display:flex; justify-content:space-between; font-size:12px; font-weight:600;">
+          <span id="uploadStatusText" style="color:var(--accent)">Đang xử lý...</span>
+          <span id="uploadSpeedMetric" style="color:var(--text-muted)">0%</span>
+        </div>
+        <div class="upload-progress-track"><div id="uploadProgressFill" class="upload-progress-fill"></div></div>
+      </div>
+
+      <div id="loadedFilesStrip" class="loaded-files hidden"></div>
+
+      <div class="upload-options">
+        <label class="checkbox-wrap">
+          <input id="chkAppendMode" type="checkbox" />
+          Gộp thêm vào bộ đề hiện có
+        </label>
+        <label for="docxFileInput" id="btnSelectDocx" class="btn btn-primary" role="button" tabindex="0">📄 Chọn file .docx / .pdf</label>
+        <button id="btnTogglePasteBox" type="button" class="btn btn-secondary">📋 Dán văn bản đề</button>
+        <button id="btnLoadSample" type="button" class="btn btn-secondary">⭐ Nạp đề mẫu thử ngay</button>
+        <button id="btnClearAllQuestions" type="button" class="btn btn-danger btn-sm">Xóa bộ đề</button>
+      </div>
+
+      <!-- Khung dán văn bản trực tiếp (Tiện lợi khi copy đề từ Zalo/Web trên iPhone) -->
+      <div id="pasteTextSection" class="upload-progress-bar hidden" style="margin-top:14px;">
+        <div style="font-size:12px;font-weight:700;margin-bottom:6px;color:var(--text-primary);">📋 Dán trực tiếp nội dung đề thi (Word / PDF / Web / Zalo):</div>
+        <textarea id="pasteRawTextarea" class="modal-input" style="min-height:130px;font-size:14px;line-height:1.6;resize:vertical;" placeholder="Dán nội dung câu hỏi vào đây (Ví dụ: Câu 1. ... A. ... B. ... C. ... D. ... kèm Bảng đáp án ở cuối nếu có)..."></textarea>
+        <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:8px;">
+          <button id="btnCancelPaste" type="button" class="btn btn-ghost btn-sm">Đóng</button>
+          <button id="btnParsePastedText" type="button" class="btn btn-primary btn-sm">⚡ Tạo đề từ văn bản đã dán</button>
+        </div>
+      </div>
+
+      <!-- Nút chuyển sang làm bài -->
+      <button id="btnStartStudy" class="upload-start-btn hidden">▶ Bắt đầu làm bài (<span id="startStudyCount">0</span> câu)</button>
+    </div>
+
+    <!-- ============ SCREEN 2: STUDY ============ -->
+    <div id="screenStudy" class="screen">
+
+      <!-- Filter Bar -->
+      <div class="filter-bar">
+        <div id="topicFilterChips" class="filter-chips"></div>
+        <div class="search-wrap">
+          <svg class="search-icon" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z"/></svg>
+          <input id="searchInput" type="text" placeholder="Tìm từ khóa hoặc số câu..." class="search-input" />
+        </div>
+        <button id="btnClearFilter" class="btn btn-secondary btn-sm">Tất cả</button>
+      </div>
+
+      <div class="study-layout">
+        <!-- Left: Question Area -->
+        <div>
+          <!-- Swipe hint for mobile -->
+          <div class="swipe-hint">👆 Vuốt trái/phải để chuyển câu</div>
+
+          <div id="questionCard" class="card animate-in">
+            <!-- Question Header -->
+            <div class="question-header">
+              <div class="question-badges">
+                <span id="qBadgeNumber" class="badge" style="background:var(--accent);color:#fff;">Câu 1</span>
+                <span id="qBadgeTopic" class="badge" style="background:var(--indigo-light);color:var(--indigo);">Chuyên đề</span>
+                <span id="qBadgeRetry" class="badge hidden" style="background:var(--warning-light);color:var(--warning);">Ôn lại</span>
+                <span id="qCounterPos" style="font-size:12px;color:var(--text-muted);margin-left:4px;">1 / 10</span>
+              </div>
+              <button id="btnStarQuestion" class="btn btn-ghost btn-sm" title="Đánh dấu sao (S)">
+                <svg id="starIcon" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/></svg>
+                <span id="starLabel">Lưu sao</span>
+              </button>
+            </div>
+
+            <!-- Question Body -->
+            <div id="questionText" class="question-body">Hãy tải file .docx để bắt đầu.</div>
+
+            <!-- Options -->
+            <div id="optionsContainer" class="options-list"></div>
+
+            <!-- Explanation -->
+            <div id="explanationBox" class="explanation-box hidden">
+              <div class="explanation-header">
+                <div style="display:flex;align-items:center;gap:8px">
+                  <span style="width:22px;height:22px;border-radius:6px;background:var(--success-light);color:var(--success);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;">✓</span>
+                  <span class="explanation-answer">Đáp án: <span id="correctAnswerSummary"></span></span>
+                </div>
+                <button id="btnAskAiAboutQuestion" class="btn btn-primary btn-sm">🤖 Hỏi AI</button>
+              </div>
+              <div id="explanationText" class="explanation-text"></div>
+            </div>
+
+            <!-- Desktop Nav -->
+            <div class="nav-bar" id="navBarDesktop">
+              <button id="btnPrevQuestion" class="btn btn-secondary">← Trước <kbd style="margin-left:4px;padding:1px 5px;border-radius:4px;font-size:10px;background:var(--bg-card-alt);border:1px solid var(--border)">←</kbd></button>
+              <div class="nav-center">
+                <button id="btnToggleExplanation" class="btn btn-secondary" style="border-color:var(--warning);color:var(--warning);">💡 Giải thích</button>
+                <button id="btnNextQuestion" class="btn btn-primary">Tiếp → <kbd style="margin-left:4px;padding:1px 5px;border-radius:4px;font-size:10px;background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.25);">→</kbd></button>
+              </div>
+            </div>
+
+            <!-- Shortcuts -->
+            <div class="shortcuts-hint">
+              <span>Phím tắt:</span>
+              <span><kbd>1-4</kbd> hoặc <kbd>A-D</kbd> chọn đáp án</span>
+              <span><kbd>←</kbd> <kbd>→</kbd> chuyển câu</span>
+              <span><kbd>S</kbd> lưu sao</span>
+              <span><kbd>E</kbd> giải thích</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: Sidebar -->
+        <div class="sidebar">
+          <!-- Mini Stats -->
+          <div class="stats-grid">
+            <div class="stat-card stat-correct">
+              <div class="stat-label">Đúng</div>
+              <div id="statCorrect" class="stat-value">0</div>
+              <div id="statAccuracy" class="stat-sub">Chính xác: 0%</div>
+            </div>
+            <div class="stat-card stat-wrong">
+              <div class="stat-label">Sai</div>
+              <div id="statWrong" class="stat-value">0</div>
+              <div id="statRetryQueue" class="stat-sub">Chờ ôn lại: 0</div>
+            </div>
+            <div class="stat-card stat-starred">
+              <div class="stat-label">Đánh dấu sao</div>
+              <div id="statStarred" class="stat-value">0</div>
+              <div class="stat-sub"><button id="btnFilterStarred" style="color:var(--accent);font-size:11px;font-weight:600;background:none;border:none;cursor:pointer;text-decoration:underline;">Lọc câu sao</button></div>
+            </div>
+            <div class="stat-card stat-progress">
+              <div class="stat-label">Tiến độ</div>
+              <div id="statProgressText" class="stat-value" style="font-size:18px;">0/0</div>
+              <div id="statPercentText" class="stat-sub">0%</div>
+            </div>
+          </div>
+
+          <!-- Sidebar tools -->
+          <div class="sidebar-tools">
+            <button id="btnShuffleAll" class="btn btn-secondary btn-sm" style="flex:1">🔀 Đảo đề</button>
+            <button id="btnResetSession" class="btn btn-secondary btn-sm" style="flex:1">🔄 Làm lại</button>
+            <button id="btnBackToUpload" class="btn btn-ghost btn-sm">📄 Đổi đề</button>
+          </div>
+
+          <!-- Matrix -->
+          <div class="card matrix-card">
+            <div class="matrix-header">
+              <div>
+                <div style="font-size:14px;font-weight:700;">Ma trận câu hỏi</div>
+                <div style="font-size:11px;color:var(--text-muted);">Nhấp số câu để nhảy nhanh</div>
+              </div>
+              <span id="matrixCountLabel" class="badge" style="background:var(--bg-card-alt);color:var(--text-secondary);border:1px solid var(--border);">0 câu</span>
+            </div>
+
+            <div class="matrix-filter-tabs">
+              <button class="matrix-filter-tab active" data-filter="all">Tất cả</button>
+              <button class="matrix-filter-tab" data-filter="unanswered">Chưa làm</button>
+              <button class="matrix-filter-tab" data-filter="wrong">Làm sai</button>
+              <button class="matrix-filter-tab" data-filter="starred">Gắn sao</button>
+            </div>
+
+            <div class="matrix-legend">
+              <span><span class="matrix-legend-dot" style="background:var(--accent);"></span>Đang xem</span>
+              <span><span class="matrix-legend-dot" style="background:var(--success);opacity:.3;border:1px solid var(--success);"></span>Đúng</span>
+              <span><span class="matrix-legend-dot" style="background:var(--danger);opacity:.3;border:1px solid var(--danger);"></span>Sai</span>
+              <span><span class="matrix-legend-dot" style="background:var(--warning);opacity:.3;border:1px solid var(--warning);"></span>Sao</span>
+            </div>
+
+            <div id="questionMatrixGrid" class="matrix-grid"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Mobile Bottom Nav Bar -->
+  <div id="navBarMobile" class="nav-bar-mobile" style="display:none;">
+    <button id="btnPrevMobile" class="btn btn-secondary" style="flex:1">← Trước</button>
+    <button id="btnStarMobile" class="btn btn-ghost btn-icon" title="Lưu sao">
+      <svg id="starIconMobile" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/></svg>
+    </button>
+    <button id="btnExplainMobile" class="btn btn-ghost btn-icon" title="Giải thích" style="font-size:16px;">💡</button>
+    <button id="btnNextMobile" class="btn btn-primary" style="flex:1">Tiếp →</button>
+  </div>
+
+  <!-- ===== AI DRAWER ===== -->
+  <div id="aiOverlay" class="ai-drawer-overlay"></div>
+  <div id="aiDrawer" class="ai-drawer">
+    <div class="ai-drawer-header">
+      <div class="ai-drawer-header-left">
+        <div class="ai-icon-wrap">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
+        </div>
+        <div>
+          <div style="font-size:14px;font-weight:700;">Trợ Lý AI</div>
+          <div id="aiModeCaption" style="font-size:11px;color:var(--text-muted);">AI Nội bộ (offline)</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;">
+        <button id="btnClearChat" class="btn btn-ghost btn-sm" style="color:var(--danger);">Xóa</button>
+        <button id="btnCloseAI" class="btn btn-ghost btn-icon">✕</button>
+      </div>
+    </div>
+
+    <div class="ai-quick-prompts">
+      <button class="ai-quick-btn" data-ai-prompt="Giải thích chi tiết câu hỏi hiện tại và phân tích vì sao các phương án khác chưa đúng.">📝 Phân tích câu</button>
+      <button class="ai-quick-btn" data-ai-prompt="Cho ví dụ thực tiễn dễ nhớ liên quan đến nội dung của câu hỏi đang hiển thị.">💡 Ví dụ thực tiễn</button>
+      <button class="ai-quick-btn" data-ai-prompt="Tóm tắt mẹo ghi nhớ nhanh các khái niệm dễ nhầm lẫn trong phần kiến thức của câu này.">🧠 Mẹo ghi nhớ</button>
+    </div>
+
+    <div id="aiChatMessages" class="ai-messages">
+      <div class="ai-msg bot-msg">Xin chào! Tải tài liệu <strong>.docx</strong> lên, rồi hỏi tôi bất cứ điều gì về câu hỏi đang ôn nhé.</div>
+    </div>
+
+    <form id="aiChatForm" class="ai-input-bar">
+      <input id="aiChatInput" type="text" placeholder="Nhập câu hỏi cho AI..." class="ai-input" />
+      <button id="btnSendAi" type="submit" class="btn btn-primary">Gửi</button>
+    </form>
+  </div>
+
+  <!-- ===== API KEY MODAL ===== -->
+  <div id="apiModal" class="modal-overlay">
+    <div class="modal-box animate-in">
+      <div class="modal-header">
+        <h3>⚙️ Cấu hình Gemini API</h3>
+        <button id="btnCloseApiModal" class="modal-close">✕</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:13px;color:var(--text-secondary);line-height:1.7;margin-bottom:12px;">
+          API Key lưu trên trình duyệt (<code style="padding:2px 6px;border-radius:4px;background:var(--bg-card-alt);font-size:12px;">localStorage</code>) và được bảo vệ bởi Tường Lửa. Nếu để trống hoặc mất mạng, AI nội bộ sẽ tự động giải thích.
+        </p>
+        <label class="modal-label" for="geminiApiKeyInput">Gemini API Key</label>
+        <input id="geminiApiKeyInput" type="password" placeholder="AIzaSy..." class="modal-input" />
+      </div>
+      <div class="modal-footer">
+        <button id="btnClearApiKey" class="btn btn-secondary">AI Nội bộ</button>
+        <button id="btnSaveApiKey" class="btn btn-primary">Lưu</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== TRUNG TÂM TƯỜNG LỬA & BẢO MẬT DỮ LIỆU MODAL ===== -->
+  <div id="securityModal" class="modal-overlay">
+    <div class="modal-box animate-in" style="max-width:520px;">
+      <div class="modal-header">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-size:18px;">🛡️</span>
+          <h3 style="font-size:16px;font-weight:800;">Trung Tâm Tường Lửa &amp; Bảo Mật</h3>
+        </div>
+        <button id="btnCloseSecurityModal" class="modal-close">✕</button>
+      </div>
+      <div class="modal-body">
+        <!-- Status Row 1: Network Firewall -->
+        <div class="sec-status-row">
+          <div class="sec-status-icon" style="background:var(--success-bg);color:var(--success);">🌐</div>
+          <div style="flex:1;">
+            <div class="sec-status-title">Tường Lửa Mạng (CSP + Runtime Proxy)</div>
+            <div class="sec-status-desc">
+              Chặn tuyệt đối 100% mọi nỗ lực kết nối mạng ra bên ngoài. Chỉ mở duy nhất cổng giao tiếp với <strong>Google Gemini API</strong> khi có sự cho phép của bạn.
+            </div>
+            <div style="font-size:11px;font-weight:700;color:var(--success);margin-top:4px;">
+              ● Đang cưỡng chế • Số yêu cầu trái phép bị chặn: <span id="secBlockedCount">0</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Status Row 2: Anti-XSS Sanitizer -->
+        <div class="sec-status-row">
+          <div class="sec-status-icon" style="background:var(--accent-bg);color:var(--accent);">🧹</div>
+          <div style="flex:1;">
+            <div class="sec-status-title">Bộ Lọc Khử Độc XSS &amp; DOCX</div>
+            <div class="sec-status-desc">
+              Lọc sạch toàn bộ mã độc tiềm ẩn, script khai thác, iframe độc hại hay thẻ HTML giả mạo trong file Word .docx trước khi hiển thị ra giao diện.
+            </div>
+            <div style="font-size:11px;font-weight:700;color:var(--accent);margin-top:4px;">
+              ● Bộ lọc tích cực • Đã khử trùng an toàn
+            </div>
+          </div>
+        </div>
+
+        <!-- Status Row 3: AES-GCM Vault -->
+        <div class="sec-status-row">
+          <div class="sec-status-icon" style="background:var(--warning-bg);color:var(--warning);">🔐</div>
+          <div style="flex:1;">
+            <div class="sec-status-title">Két Sắt Mã Hóa Toàn Diện (AES-GCM 256-bit)</div>
+            <div class="sec-status-desc">
+              Mã hóa toàn bộ câu hỏi, lịch sử và API Key trong máy tính bằng thuật toán mật mã quân sự. Bất cứ ai mở file sẽ phải nhập Mã PIN mới đọc được đề thi.
+            </div>
+            <div id="vaultStatusText" style="font-size:11px;font-weight:700;margin-top:4px;color:var(--text-muted);">
+              Trạng thái: Chưa kích hoạt mã PIN
+            </div>
+          </div>
+        </div>
+
+        <!-- Vault Controls -->
+        <div style="margin-top:14px;padding:12px;border-radius:var(--radius-md);background:var(--bg-input);border:1px solid var(--border);">
+          <div style="font-size:12px;font-weight:700;margin-bottom:8px;color:var(--text-primary);">
+            Cài Đặt Khóa Két Sắt (Mã PIN):
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <input id="secNewPinInput" type="password" placeholder="Nhập mã PIN bảo vệ mới..." class="modal-input" style="flex:1;min-width:180px;" />
+            <button id="btnSetVaultPin" class="btn btn-primary btn-sm">🔒 Đặt PIN</button>
+            <button id="btnDisableVaultPin" class="btn btn-danger btn-sm hidden">Hủy PIN</button>
+            <button id="btnLockVaultNow" class="btn btn-secondary btn-sm hidden">Khóa ngay</button>
+          </div>
+          <p style="font-size:11px;color:var(--text-muted);margin-top:6px;">
+            Ghi nhớ mã PIN của bạn. Nếu quên mã PIN, bạn sẽ phải bấm "Xóa bộ đề" để đặt lại.
+          </p>
+        </div>
+
+        <!-- Security Logs -->
+        <div style="margin-top:14px;">
+          <div style="font-size:12px;font-weight:700;color:var(--text-primary);display:flex;justify-content:space-between;align-items:center;">
+            <span>Nhật Ký Giám Sát An Ninh:</span>
+            <button id="btnClearSecLogs" class="btn btn-ghost btn-sm" style="font-size:10px;padding:2px 6px;">Xóa log</button>
+          </div>
+          <div id="secLogContainer" class="sec-log-box">
+            [Hệ thống] Tường lửa khởi chạy thành công. Kết nối ngoại vi được kiểm soát 100%.
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="btnCloseSecurityModal2" class="btn btn-secondary">Đóng</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       JAVASCRIPT — BẢO MẬT & TƯỜNG LỬA CHỐNG XÂM NHẬP TOÀN DIỆN
+       ============================================================ -->
+  <script>
+    // =========================================================================
+    // 0. TƯỜNG LỬA MẠNG CẤP RUNTIME & GIÁM SÁT AN NINH (SECURITY ENGINE)
+    // =========================================================================
+    const SecurityEngine = (function() {
+      const ALLOWED_HOSTS = ['generativelanguage.googleapis.com', 'cdn.jsdelivr.net'];
+      let blockedCount = 0;
+      const logs = [];
+
+      function addLog(action, target, message) {
+        blockedCount++;
+        const time = new Date().toLocaleTimeString();
+        const entry = `[${time}] ${action}: ${String(target).slice(0, 50)} (${message})`;
+        logs.unshift(entry);
+        if (logs.length > 50) logs.pop();
+        updateSecurityUI();
+      }
+
+      function isUrlAllowed(urlStr) {
+        if (!urlStr) return false;
+        try {
+          // Allow blob and data URLs for local internal operations
+          if (urlStr.startsWith('blob:') || urlStr.startsWith('data:')) return true;
+          const u = new URL(urlStr, window.location.href);
+          if (ALLOWED_HOSTS.includes(u.hostname.toLowerCase())) return true;
+          return false;
+        } catch {
+          return false;
+        }
+      }
+
+      // Wrap window.fetch
+      const originalFetch = window.fetch;
+      window.fetch = function(resource, config) {
+        const url = typeof resource === 'string' ? resource : (resource && resource.url ? resource.url : '');
+        if (!isUrlAllowed(url)) {
+          addLog('CHẶN HTTP FETCH', url, 'Nỗ lực đọc dữ liệu hoặc gửi tin ra ngoài');
+          return Promise.reject(new Error('[Tường Lửa] Kết nối mạng bị chặn bởi chính sách an toàn.'));
+        }
+        return originalFetch.apply(this, arguments);
+      };
+
+      // Wrap XMLHttpRequest
+      if (window.XMLHttpRequest) {
+        const OrigXHR = window.XMLHttpRequest;
+        const origOpen = OrigXHR.prototype.open;
+        OrigXHR.prototype.open = function(method, url) {
+          if (!isUrlAllowed(url)) {
+            addLog('CHẶN XHR', url, 'Nỗ lực mở kết nối ngầm');
+            throw new Error('[Tường Lửa] Kết nối XMLHttpRequest bị chặn.');
+          }
+          return origOpen.apply(this, arguments);
+        };
+      }
+
+      // Wrap sendBeacon
+      if (navigator.sendBeacon) {
+        const origBeacon = navigator.sendBeacon.bind(navigator);
+        navigator.sendBeacon = function(url, data) {
+          if (!isUrlAllowed(url)) {
+            addLog('CHẶN BEACON', url, 'Nỗ lực gửi trộm dữ liệu nền');
+            return false;
+          }
+          return origBeacon(url, data);
+        };
+      }
+
+      // Block unauthorized WebSocket
+      if (window.WebSocket) {
+        window.WebSocket = function(url) {
+          addLog('CHẶN WEBSOCKET', url, 'Cổng WebSocket bị vô hiệu hóa để bảo vệ offline');
+          throw new Error('[Tường Lửa] Không cho phép kết nối WebSocket.');
+        };
+      }
+
+      // Protect against Prototype Pollution
+      try {
+        if (Object.prototype) {
+          Object.defineProperty(Object.prototype, '__security_shield__', {
+            value: true,
+            writable: false,
+            configurable: false
+          });
+        }
+      } catch {}
+
+      return {
+        getBlockedCount: () => blockedCount,
+        getLogs: () => [...logs],
+        clearLogs: () => { logs.length = 0; updateSecurityUI(); },
+        addAuditEntry: (act, target, msg) => addLog(act, target, msg)
+      };
+    })();
+
+    // Helper: update security dashboard UI
+    function updateSecurityUI() {
+      const cnt = document.getElementById("secBlockedCount");
+      if (cnt) cnt.textContent = String(SecurityEngine.getBlockedCount());
+      const logBox = document.getElementById("secLogContainer");
+      if (logBox) {
+        const logs = SecurityEngine.getLogs();
+        if (logs.length === 0) {
+          logBox.textContent = "[Hệ thống] Tường lửa đang trực chiến. Không phát hiện mối đe dọa nào.";
+        } else {
+          logBox.innerHTML = logs.map(l => escapeHtml(l)).join("<br>");
+        }
+      }
+    }
+
+    // =========================================================================
+    // 0.1 KÉT SẮT MÃ HÓA AES-GCM 256-BIT WEB CRYPTO API
+    // =========================================================================
+    const VaultCrypto = (function() {
+      const subtle = window.crypto && window.crypto.subtle;
+
+      function uint8ToBase64(u8) {
+        let binary = '';
+        const len = u8.byteLength;
+        const chunkSize = 8192;
+        for (let i = 0; i < len; i += chunkSize) {
+          const chunk = u8.subarray(i, Math.min(i + chunkSize, len));
+          binary += String.fromCharCode.apply(null, chunk);
+        }
+        return btoa(binary);
+      }
+
+      function base64ToUint8(b64) {
+        const binary = atob(b64);
+        const len = binary.length;
+        const u8 = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {
+          u8[i] = binary.charCodeAt(i);
+        }
+        return u8;
+      }
+
+      async function deriveKey(pin, salt) {
+        const enc = new TextEncoder();
+        const keyMaterial = await subtle.importKey(
+          'raw',
+          enc.encode(pin),
+          'PBKDF2',
+          false,
+          ['deriveKey']
+        );
+        return subtle.deriveKey(
+          {
+            name: 'PBKDF2',
+            salt: salt,
+            iterations: 100000,
+            hash: 'SHA-256'
+          },
+          keyMaterial,
+          { name: 'AES-GCM', length: 256 },
+          false,
+          ['encrypt', 'decrypt']
+        );
+      }
+
+      async function encrypt(plaintext, pin) {
+        if (!subtle) throw new Error('Trình duyệt không hỗ trợ Web Crypto API.');
+        const salt = window.crypto.getRandomValues(new Uint8Array(16));
+        const iv = window.crypto.getRandomValues(new Uint8Array(12));
+        const key = await deriveKey(pin, salt);
+        const enc = new TextEncoder();
+        const cipherBuf = await subtle.encrypt(
+          { name: 'AES-GCM', iv: iv },
+          key,
+          enc.encode(plaintext)
+        );
+        return 'ENC:' + JSON.stringify({
+          salt: uint8ToBase64(salt),
+          iv: uint8ToBase64(iv),
+          data: uint8ToBase64(new Uint8Array(cipherBuf))
+        });
+      }
+
+      async function decrypt(cipherStr, pin) {
+        if (!subtle) throw new Error('Trình duyệt không hỗ trợ Web Crypto API.');
+        if (!cipherStr || !cipherStr.startsWith('ENC:')) return null;
+        const payload = JSON.parse(cipherStr.slice(4));
+        const salt = base64ToUint8(payload.salt);
+        const iv = base64ToUint8(payload.iv);
+        const ciphertext = base64ToUint8(payload.data);
+        const key = await deriveKey(pin, salt);
+        try {
+          const decBuf = await subtle.decrypt(
+            { name: 'AES-GCM', iv: iv },
+            key,
+            ciphertext
+          );
+          const dec = new TextDecoder();
+          return dec.decode(decBuf);
+        } catch {
+          throw new Error('Sai mã PIN hoặc dữ liệu bị can thiệp!');
+        }
+      }
+
+      return { encrypt, decrypt };
+    })();
+
+    // =========================================================================
+    // 1. STATE & STORAGE MANAGEMENT (WITH VAULT LOCKING)
+    // =========================================================================
+    // Polyfill structuredClone cho các dòng iPhone / iOS Safari cũ (< iOS 15.4)
+    if (typeof window.structuredClone !== "function") {
+      window.structuredClone = function(obj) {
+        return JSON.parse(JSON.stringify(obj));
+      };
+    }
+
+    let QUESTION_BANK = [];
+    const STORAGE_KEY = "docx_quiz_v5_state";
+    const VAULT_META_KEY = "docx_quiz_v5_vault_meta";
+    const LEGACY_STORAGE_KEY = "docx_quiz_studio_state_v2";
+    const API_KEY_STORAGE = "pldc_gemini_api_key_v1";
+
+    let activeVaultSessionPin = ""; // Kept in memory only during active session
+
+    const defaultState = {
+      mode: "quiz", topicFilter: "ALL", searchQuery: "", onlyStarred: false,
+      matrixFilter: "all", loadedFiles: [], questions: [], queueIds: [],
+      currentIndex: 0, answered: {}, questionOptionOrders: {},
+      starredIds: [], wrongStreakCount: 0, pendingRetryIds: [],
+      showExplanationManual: {}, currentScreen: "upload",
+      autoAdvance: false
+    };
+
+    let state = structuredClone(defaultState);
+
+    function isVaultConfigured() {
+      try {
+        const meta = localStorage.getItem(VAULT_META_KEY);
+        return Boolean(meta && JSON.parse(meta).enabled);
+      } catch {
+        return false;
+      }
+    }
+
+    function initAppState() {
+      try {
+        if (isVaultConfigured()) {
+          // Vault is locked! Show lock screen
+          showVaultLockScreen();
+          return;
+        }
+
+        let raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) {
+          raw = localStorage.getItem(LEGACY_STORAGE_KEY);
+        }
+        if (raw) {
+          const p = JSON.parse(raw);
+          state = {
+            ...structuredClone(defaultState),
+            ...p,
+            loadedFiles: Array.isArray(p.loadedFiles) ? p.loadedFiles : [],
+            questions: Array.isArray(p.questions) ? p.questions : [],
+            queueIds: Array.isArray(p.queueIds) ? p.queueIds : [],
+            answered: p.answered || {},
+            questionOptionOrders: p.questionOptionOrders || {},
+            starredIds: Array.isArray(p.starredIds) ? p.starredIds : [],
+            pendingRetryIds: Array.isArray(p.pendingRetryIds) ? p.pendingRetryIds : [],
+            showExplanationManual: p.showExplanationManual || {}
+          };
+          QUESTION_BANK = Array.isArray(state.questions) ? state.questions : [];
+        }
+      } catch (err) {
+        state = structuredClone(defaultState);
+        QUESTION_BANK = [];
+      }
+      renderUploadScreen();
+      if (QUESTION_BANK.length > 0 && state.currentScreen === "study") {
+        switchScreen("study");
+      } else {
+        switchScreen("upload");
+      }
+      renderAll();
+      updateVaultUI();
+    }
+
+    async function saveState() {
+      try {
+        state.questions = QUESTION_BANK;
+        const serialized = JSON.stringify(state);
+
+        if (isVaultConfigured() && activeVaultSessionPin) {
+          const enc = await VaultCrypto.encrypt(serialized, activeVaultSessionPin);
+          localStorage.setItem(STORAGE_KEY, enc);
+        } else {
+          localStorage.setItem(STORAGE_KEY, serialized);
+        }
+      } catch (err) {
+        console.warn("Lưu state thất bại:", err);
+      }
+    }
+
+    function getGeminiApiKey() {
+      try { return (localStorage.getItem(API_KEY_STORAGE) || "").trim(); } catch { return ""; }
+    }
+    function setGeminiApiKey(key) {
+      try {
+        if (key) localStorage.setItem(API_KEY_STORAGE, key.trim());
+        else localStorage.removeItem(API_KEY_STORAGE);
+      } catch {}
+    }
+
+    // =========================================================================
+    // 1.1 VAULT SCREEN & PIN ACTIONS
+    // =========================================================================
+    function showVaultLockScreen() {
+      document.getElementById("screenVaultLock").classList.add("active");
+      document.getElementById("screenUpload").classList.remove("active");
+      document.getElementById("screenStudy").classList.remove("active");
+      document.getElementById("screenNav").style.display = "none";
+      document.getElementById("studyModeSwitch").style.display = "none";
+      const mobileNav = document.getElementById("navBarMobile");
+      if (mobileNav) mobileNav.style.display = "none";
+      document.getElementById("securityBadgeLabel").textContent = "Két Sắt: Khóa 🔒";
+    }
+
+    async function handleUnlockVault(pin) {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) {
+          // Empty state
+          activeVaultSessionPin = pin;
+          state = structuredClone(defaultState);
+          QUESTION_BANK = [];
+        } else if (raw.startsWith("ENC:")) {
+          const dec = await VaultCrypto.decrypt(raw, pin);
+          const p = JSON.parse(dec);
+          state = {
+            ...structuredClone(defaultState),
+            ...p,
+            loadedFiles: Array.isArray(p.loadedFiles) ? p.loadedFiles : [],
+            questions: Array.isArray(p.questions) ? p.questions : [],
+            queueIds: Array.isArray(p.queueIds) ? p.queueIds : []
+          };
+          QUESTION_BANK = Array.isArray(state.questions) ? state.questions : [];
+          activeVaultSessionPin = pin;
+        } else {
+          // Was not encrypted yet
+          activeVaultSessionPin = pin;
+          state = JSON.parse(raw);
+          QUESTION_BANK = Array.isArray(state.questions) ? state.questions : [];
+        }
+
+        // Hide lock screen
+        document.getElementById("screenVaultLock").classList.remove("active");
+        document.getElementById("screenNav").style.display = "inline-flex";
+        document.getElementById("securityBadgeLabel").textContent = "Tường Lửa: Bật 🛡️";
+        showToast("Mở khóa két sắt thành công! Dữ liệu đã sẵn sàng.", "success");
+
+        renderUploadScreen();
+        if (QUESTION_BANK.length > 0 && state.currentScreen === "study") {
+          switchScreen("study");
+        } else {
+          switchScreen("upload");
+        }
+        renderAll();
+        updateVaultUI();
+      } catch (err) {
+        showToast(err.message || "Mã PIN không đúng!", "error");
+        SecurityEngine.addAuditEntry('MỞ KHÓA THẤT BẠI', 'Két sắt', 'Nhập sai mã PIN bảo vệ');
+      }
+    }
+
+    async function setVaultPin(newPin) {
+      if (!newPin || newPin.trim().length < 3) {
+        showToast("Mã PIN phải có ít nhất 3 ký tự!", "warning");
+        return;
+      }
+      activeVaultSessionPin = newPin.trim();
+      localStorage.setItem(VAULT_META_KEY, JSON.stringify({ enabled: true, date: new Date().toISOString() }));
+      await saveState();
+      updateVaultUI();
+      showToast("Đã kích hoạt Két Sắt! Toàn bộ đề thi được mã hóa AES-GCM.", "success");
+      SecurityEngine.addAuditEntry('KÍCH HOẠT KÉT SẮT', 'AES-GCM', 'Đã thiết lập mã PIN bảo vệ dữ liệu');
+    }
+
+    async function disableVaultPin() {
+      if (!confirm("Bạn có chắc chắn muốn hủy mã PIN bảo vệ? Dữ liệu sẽ lưu ở dạng thông thường.")) return;
+      localStorage.removeItem(VAULT_META_KEY);
+      activeVaultSessionPin = "";
+      await saveState();
+      updateVaultUI();
+      showToast("Đã tắt mã PIN bảo vệ két sắt.", "info");
+      SecurityEngine.addAuditEntry('HỦY MÃ PIN', 'Két sắt', 'Dữ liệu chuyển về lưu trữ cục bộ cơ bản');
+    }
+
+    function lockVaultNow() {
+      if (!isVaultConfigured()) return;
+      activeVaultSessionPin = "";
+      state = structuredClone(defaultState);
+      QUESTION_BANK = [];
+      showVaultLockScreen();
+      const secModal = document.getElementById("securityModal");
+      if (secModal) secModal.classList.remove("open");
+      showToast("Đã khóa két sắt an toàn!", "info");
+      SecurityEngine.addAuditEntry('KHÓA KÉT SẮT', 'Khóa phiên', 'Người dùng chủ động khóa két sắt');
+    }
+
+    function updateVaultUI() {
+      const isEnabled = isVaultConfigured();
+      const statusText = document.getElementById("vaultStatusText");
+      const btnDisable = document.getElementById("btnDisableVaultPin");
+      const btnLock = document.getElementById("btnLockVaultNow");
+      const badge = document.getElementById("securityBadgeLabel");
+
+      if (isEnabled) {
+        if (statusText) statusText.innerHTML = "Trạng thái: <strong style='color:var(--success)'>Đang khóa bằng AES-GCM 256-bit</strong>";
+        if (btnDisable) btnDisable.classList.remove("hidden");
+        if (btnLock) btnLock.classList.remove("hidden");
+        if (badge) badge.textContent = "Két Sắt: Bật 🔒";
+      } else {
+        if (statusText) statusText.innerHTML = "Trạng thái: Chưa kích hoạt mã PIN (đang bảo vệ bằng Tường Lửa)";
+        if (btnDisable) btnDisable.classList.add("hidden");
+        if (btnLock) btnLock.classList.add("hidden");
+        if (badge) badge.textContent = "Tường Lửa: Bật 🛡️";
+      }
+    }
+
+    // =========================================================================
+    // 2. DOCX READER — 100% OFFLINE + XSS SANITIZATION
+    // =========================================================================
+    const JUNK_LINE_REGEX = new RegExp([
+      "https?:\/\/\S+", "www\.\S+",
+      "(?:tải|download|xem thêm|tham khảo|nguồn|biên soạn|tổng hợp|chia sẻ|share|subscribe|đăng ký kênh|follow|liên hệ|zalo|facebook|fanpage|group|nhóm học tập|tiktok|youtube|shopee|lazada|tiki|tailieu|loigiaihay|vietjack|hoc247|olm|tracnghiem|studocu|scribd|123doc|docx\.vn|violet\.vn)\b",
+      "(?:bản quyền thuộc về|mọi thắc mắc xin liên hệ|tài liệu lưu hành nội bộ|tài liệu miễn phí|chúc các bạn thi tốt|hết\s*[-–—]*\s*$)",
+      "^[-=_*~•·.]{4,}$", "^trang\s*\d+(?:\s*\/\s*\d+)?$"
+    ].join("|"), "i");
+
+    function cleanAndNormalizeDocxText(rawText) {
+      if (!rawText) return "";
+      const lines = rawText.replace(/\r\n?/g, "\n").replace(/\u00A0/g, " ").replace(/[\u200B-\u200D\uFEFF]/g, "").split("\n");
+      const cleaned = [];
+      let prevBlank = false;
+      for (let i = 0; i < lines.length; i++) {
+        let line = lines[i].replace(/\s+/g, " ").trim();
+        if (!line) {
+          if (!prevBlank && cleaned.length > 0) { cleaned.push(""); prevBlank = true; }
+          continue;
+        }
+        if (JUNK_LINE_REGEX.test(line) && !/^(?:câu|bài|\d+[\.)\:])\s*\d*/i.test(line)) continue;
+        line = line.replace(/\s*[\(\[\{]?\s*(?:nguồn|tải tại|xem tại|https?:\/\/\S+|www\.\S+)[^\)\]\}]*[\)\]\}]?/gi, "").trim();
+        if (!line) continue;
+        cleaned.push(line);
+        prevBlank = false;
+      }
+      return cleaned.join("\n").trim();
+    }
+
+    function extractAnswerKeyMap(text) {
+      const map = {};
+      const lines = text.split("\n");
+      const startIdx = Math.max(0, Math.floor(lines.length * 0.55));
+      const pairRegex = /(?:câu\s*)?(\d{1,4})\s*[\.\-\:\)\/]?\s*([A-Da-d])(?=\s|$|,|;|\||\.|\))/g;
+      for (let i = startIdx; i < lines.length; i++) {
+        const line = lines[i];
+        const matches = [...line.matchAll(pairRegex)];
+        if (matches.length >= 2 || (/^(?:đáp án|bảng đáp án|key)/i.test(line) && matches.length >= 1)) {
+          for (const m of matches) {
+            const num = parseInt(m[1], 10);
+            if (num > 0 && num <= 5000) map[num] = m[2].toLowerCase();
+          }
+        }
+      }
+      return map;
+    }
+
+    function parseQuestionsFromCleanText(cleanText, fileTopicName = "Tài liệu DOCX", startId = 1) {
+      const answerKeyMap = extractAnswerKeyMap(cleanText);
+      const lines = cleanText.split("\n");
+      const questions = [];
+      let currentTopic = fileTopicName;
+      let currentQ = null;
+      let lastOptionKey = null;
+
+      const topicHeaderRe = /^(?:phần|chương|chuyên đề|chủ đề|mục)\s+[IVXLCDM\d]+[\.\:\-\s]+(.+)$/i;
+      const questionStartRe = /^(?:(?:câu|bài)\s*(\d+)\s*[\.\:\)\-]?\s*|(\d+)\s*[\.\)]\s+)(.+)$/i;
+      const optionLineRe = /^(\*?)\s*([A-Da-d])\s*[\.\)\:\-]\s*(.+)$/;
+      const inlineOptionsRe = /(?:^|\s)(\*?[A-Da-d])[\.\)\:]\s+(?=\S)/g;
+      const inlineAnswerRe = /^(?:đáp án(?:\s*đúng)?|chọn|key)\s*[\:\-\=]?\s*([A-Da-d])\b(?:[\.\:\-\s]+(.*))?$/i;
+      const inlineExplainRe = /^(?:giải thích|hướng dẫn|lời giải|căn cứ)\s*[\:\-\=]\s*(.+)$/i;
+
+      function finalizeCurrentQuestion() {
+        if (!currentQ) return;
+        const optKeys = ["a", "b", "c", "d"];
+        const validOpts = optKeys.filter(k => currentQ.options[k] && currentQ.options[k].trim().length > 0);
+        if (validOpts.length >= 2) {
+          optKeys.forEach(k => {
+            if (!currentQ.options[k]) currentQ.options[k] = "(Không có phương án này trong tài liệu)";
+          });
+          if (!currentQ.answer) {
+            if (currentQ.origNum && answerKeyMap[currentQ.origNum]) currentQ.answer = answerKeyMap[currentQ.origNum];
+            else {
+              currentQ.answer = "a";
+              if (!currentQ.explanation) currentQ.explanation = "Tài liệu gốc chưa ghi rõ đáp án; tạm đặt A. Bấm 'Hỏi AI' để kiểm tra.";
+            }
+          }
+          if (!currentQ.explanation) {
+            currentQ.explanation = `Đáp án ${currentQ.answer.toUpperCase()} (${currentQ.options[currentQ.answer]}) — theo nội dung "${currentQ.topic}".`;
+          }
+          questions.push({
+            id: startId + questions.length,
+            topic: sanitizeHtml(currentQ.topic),
+            question: sanitizeHtml(currentQ.question.trim()),
+            options: {
+              a: sanitizeHtml(currentQ.options.a),
+              b: sanitizeHtml(currentQ.options.b),
+              c: sanitizeHtml(currentQ.options.c),
+              d: sanitizeHtml(currentQ.options.d)
+            },
+            answer: currentQ.answer,
+            explanation: sanitizeHtml(currentQ.explanation.trim())
+          });
+        }
+        currentQ = null;
+        lastOptionKey = null;
+      }
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        if (!line) continue;
+        const tMatch = line.match(topicHeaderRe);
+        if (tMatch && line.length <= 120) {
+          finalizeCurrentQuestion();
+          currentTopic = line.replace(/\s+/g, " ").trim();
+          continue;
+        }
+        const qMatch = line.match(questionStartRe);
+        if (qMatch) {
+          const origNum = parseInt(qMatch[1] || qMatch[2], 10);
+          let body = (qMatch[3] || "").trim();
+          const inlineMatches = [...body.matchAll(inlineOptionsRe)];
+          if (inlineMatches.length >= 2) {
+            finalizeCurrentQuestion();
+            const firstOptIdx = inlineMatches[0].index;
+            currentQ = {
+              origNum, topic: currentTopic,
+              question: body.slice(0, firstOptIdx).trim() || `Câu hỏi số ${origNum}`,
+              options: { a: "", b: "", c: "", d: "" }, answer: null, explanation: ""
+            };
+            for (let mIdx = 0; mIdx < inlineMatches.length; mIdx++) {
+              const cur = inlineMatches[mIdx];
+              const nextIdx = mIdx + 1 < inlineMatches.length ? inlineMatches[mIdx + 1].index : body.length;
+              const rawTag = cur[1];
+              const isStarredOpt = rawTag.startsWith("*");
+              const key = rawTag.replace("*", "").toLowerCase();
+              let val = body.slice(cur.index + cur[0].length, nextIdx).trim();
+              if (isStarredOpt || /\(\s*(?:đúng|correct|\*)\s*\)\s*$/i.test(val) || /\*\s*$/.test(val)) {
+                currentQ.answer = key;
+                val = val.replace(/\(\s*(?:đúng|correct|\*)\s*\)\s*$/i, "").replace(/\*\s*$/, "").trim();
+              }
+              currentQ.options[key] = val;
+              lastOptionKey = key;
+            }
+            continue;
+          }
+          finalizeCurrentQuestion();
+          currentQ = {
+            origNum, topic: currentTopic, question: body,
+            options: { a: "", b: "", c: "", d: "" }, answer: null, explanation: ""
+          };
+          lastOptionKey = null;
+          continue;
+        }
+        if (!currentQ) continue;
+        const ansMatch = line.match(inlineAnswerRe);
+        if (ansMatch) {
+          currentQ.answer = ansMatch[1].toLowerCase();
+          if (ansMatch[2]?.trim()) currentQ.explanation = ansMatch[2].trim();
+          lastOptionKey = null;
+          continue;
+        }
+        const expMatch = line.match(inlineExplainRe);
+        if (expMatch) {
+          currentQ.explanation = (currentQ.explanation ? currentQ.explanation + " " : "") + expMatch[1].trim();
+          lastOptionKey = null;
+          continue;
+        }
+        const multiOptMatches = [...line.matchAll(inlineOptionsRe)];
+        if (multiOptMatches.length >= 2) {
+          for (let mIdx = 0; mIdx < multiOptMatches.length; mIdx++) {
+            const cur = multiOptMatches[mIdx];
+            const nextIdx = mIdx + 1 < multiOptMatches.length ? multiOptMatches[mIdx + 1].index : line.length;
+            const rawTag = cur[1];
+            const isStarredOpt = rawTag.startsWith("*");
+            const key = rawTag.replace("*", "").toLowerCase();
+            let val = line.slice(cur.index + cur[0].length, nextIdx).trim();
+            if (isStarredOpt || /\(\s*(?:đúng|correct|\*)\s*\)\s*$/i.test(val) || /\*\s*$/.test(val)) {
+              currentQ.answer = key;
+              val = val.replace(/\(\s*(?:đúng|correct|\*)\s*\)\s*$/i, "").replace(/\*\s*$/, "").trim();
+            }
+            currentQ.options[key] = val;
+            lastOptionKey = key;
+          }
+          continue;
+        }
+        const optMatch = line.match(optionLineRe);
+        if (optMatch) {
+          const isStarPrefix = optMatch[1] === "*";
+          const key = optMatch[2].toLowerCase();
+          let val = optMatch[3].trim();
+          if (isStarPrefix || /\(\s*(?:đúng|correct|\*)\s*\)\s*$/i.test(val) || /\*\s*$/.test(val)) {
+            currentQ.answer = key;
+            val = val.replace(/\(\s*(?:đúng|correct|\*)\s*\)\s*$/i, "").replace(/\*\s*$/, "").trim();
+          }
+          currentQ.options[key] = val;
+          lastOptionKey = key;
+          continue;
+        }
+        if (lastOptionKey && currentQ.options[lastOptionKey]) currentQ.options[lastOptionKey] += " " + line;
+        else currentQ.question += " " + line;
+      }
+      finalizeCurrentQuestion();
+      return questions;
+    }
+
+    function extractRichTextFromDocumentXml(xmlString) {
+      const parser = new DOMParser();
+      const xmlDoc = parser.parseFromString(xmlString, "application/xml");
+      const paragraphs = xmlDoc.getElementsByTagName("w:p");
+      const outLines = [];
+      for (let i = 0; i < paragraphs.length; i++) {
+        const p = paragraphs[i];
+        const runs = p.getElementsByTagName("w:r");
+        let lineText = "";
+        let hasMarkedCorrectStyle = false;
+        for (let j = 0; j < runs.length; j++) {
+          const r = runs[j];
+          const rPr = r.getElementsByTagName("w:rPr")[0];
+          let runText = "";
+          const tNodes = r.getElementsByTagName("w:t");
+          for (let k = 0; k < tNodes.length; k++) runText += tNodes[k].textContent || "";
+          if (!runText) continue;
+          if (rPr) {
+            const hasBold = rPr.getElementsByTagName("w:b").length > 0;
+            const hasUnderline = rPr.getElementsByTagName("w:u").length > 0;
+            const hasHighlight = rPr.getElementsByTagName("w:highlight").length > 0;
+            const colorNode = rPr.getElementsByTagName("w:color")[0];
+            const colorVal = colorNode ? (colorNode.getAttribute("w:val") || "").toUpperCase() : "";
+            const isColored = colorVal && colorVal !== "AUTO" && colorVal !== "000000" && colorVal !== "111111" && colorVal !== "222222";
+            if ((hasUnderline || hasHighlight || isColored || hasBold) && /^\s*[A-Da-d]\s*[\.\)\:]/.test(runText)) {
+              hasMarkedCorrectStyle = true;
+            }
+          }
+          lineText += runText;
+        }
+        const trimmed = lineText.trim();
+        if (!trimmed) continue;
+        outLines.push(hasMarkedCorrectStyle && /^[A-Da-d]\s*[\.\)\:]/.test(trimmed) ? "*" + trimmed : trimmed);
+      }
+      return outLines.join("\n");
+    }
+
+    // =========================================================================
+    // 2.1 BỘ ĐỌC FILE ĐA TẦNG CHO IPHONE (SAFARI / GOOGLE / ZALO WEBVIEW) + ĐỌC PDF & DOCX
+    // =========================================================================
+    async function readFileAsArrayBufferSafe(file) {
+      if (!file) throw new Error("Không nhận được đối tượng tệp.");
+      // Tầng 1: FileReader readAsArrayBuffer (ổn định nhất trên các bản iOS Safari & WKWebView)
+      try {
+        const buf = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => (reader.result && reader.result.byteLength > 0 ? resolve(reader.result) : reject(new Error("Empty")));
+          reader.onerror = () => reject(reader.error || new Error("FileReader error"));
+          reader.readAsArrayBuffer(file);
+        });
+        if (buf && buf.byteLength > 0) return buf;
+      } catch {}
+
+      // Tầng 2: file.arrayBuffer()
+      if (typeof file.arrayBuffer === "function") {
+        try {
+          const buf = await file.arrayBuffer();
+          if (buf && buf.byteLength > 0) return buf;
+        } catch {}
+      }
+
+      // Tầng 3: new Response(file).arrayBuffer()
+      if (typeof Response !== "undefined") {
+        try {
+          const buf = await new Response(file).arrayBuffer();
+          if (buf && buf.byteLength > 0) return buf;
+        } catch {}
+      }
+
+      // Tầng 4: FileReader readAsDataURL -> giải mã Base64 (Vượt qua lỗi NotReadableError của Trình xem HTML trên iOS)
+      try {
+        const dataUrl = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => (reader.result ? resolve(String(reader.result)) : reject(new Error("Empty DataURL")));
+          reader.onerror = () => reject(reader.error || new Error("DataURL error"));
+          reader.readAsDataURL(file);
+        });
+        const commaIdx = dataUrl.indexOf(",");
+        if (commaIdx >= 0) {
+          const b64 = dataUrl.slice(commaIdx + 1);
+          const binary = atob(b64);
+          const u8 = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i++) u8[i] = binary.charCodeAt(i);
+          if (u8.byteLength > 0) return u8.buffer;
+        }
+      } catch {}
+
+      throw new Error("Tệp đang nằm trên đám mây iCloud chưa tải về máy hoặc Trình xem tạm thời khóa quyền đọc tệp. Hãy mở trang web bằng Safari / Chrome hoặc dùng nút '📋 Dán văn bản đề'.");
+    }
+
+    async function extractDocxXmlNativeZeroCopy(arrayBuffer) {
+      const view = new DataView(arrayBuffer);
+      const u8 = new Uint8Array(arrayBuffer);
+      const len = u8.length;
+      let eocdOffset = -1;
+      const minSearch = Math.max(0, len - 65557);
+      for (let i = len - 22; i >= minSearch; i--) {
+        if (view.getUint32(i, true) === 0x06054b50) { eocdOffset = i; break; }
+      }
+      if (eocdOffset === -1) throw new Error("Tệp không đúng cấu trúc ZIP/.docx.");
+      const totalEntries = view.getUint16(eocdOffset + 10, true);
+      let cdOffset = view.getUint32(eocdOffset + 16, true);
+      const decoder = new TextDecoder("utf-8");
+      for (let idx = 0; idx < totalEntries && cdOffset + 46 <= len; idx++) {
+        if (view.getUint32(cdOffset, true) !== 0x02014b50) break;
+        const compression = view.getUint16(cdOffset + 10, true);
+        const compSize = view.getUint32(cdOffset + 20, true);
+        const fileNameLen = view.getUint16(cdOffset + 28, true);
+        const extraLen = view.getUint16(cdOffset + 30, true);
+        const commentLen = view.getUint16(cdOffset + 32, true);
+        const localHeaderOffset = view.getUint32(cdOffset + 42, true);
+        const fileName = decoder.decode(u8.subarray(cdOffset + 46, cdOffset + 46 + fileNameLen));
+        cdOffset += 46 + fileNameLen + extraLen + commentLen;
+        if (fileName === "word/document.xml") {
+          const localNameLen = view.getUint16(localHeaderOffset + 26, true);
+          const localExtraLen = view.getUint16(localHeaderOffset + 28, true);
+          const dataStart = localHeaderOffset + 30 + localNameLen + localExtraLen;
+          const compressedSlice = u8.subarray(dataStart, dataStart + compSize);
+          if (compression === 0) return decoder.decode(compressedSlice);
+          if (compression === 8 && typeof DecompressionStream !== "undefined") {
+            try {
+              const ds = new DecompressionStream("deflate-raw");
+              const writer = ds.writable.getWriter();
+              writer.write(compressedSlice);
+              writer.close();
+              const buf = await new Response(ds.readable).arrayBuffer();
+              return decoder.decode(buf);
+            } catch (streamErr) {
+              const blob = new Blob([compressedSlice]);
+              const decompressedStream = blob.stream().pipeThrough(new DecompressionStream("deflate-raw"));
+              const buf = await new Response(decompressedStream).arrayBuffer();
+              return decoder.decode(buf);
+            }
+          }
+        }
+      }
+      throw new Error("Không tìm thấy word/document.xml trong tệp .docx.");
+    }
+
+    // Bộ đọc file PDF bằng PDF.js (tái tạo chính xác từng dòng theo tọa độ Y và khoảng cách X) + Fallback Offline
+    async function extractTextFromPdfBuffer(arrayBuffer) {
+      if (window.pdfjsLib) {
+        try {
+          if (!window.pdfjsLib.GlobalWorkerOptions.workerSrc) {
+            window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js";
+          }
+          const loadingTask = window.pdfjsLib.getDocument({
+            data: new Uint8Array(arrayBuffer),
+            disableWorker: true // Chạy trực tiếp trên main thread để tương thích 100% với Tường lửa CSP & Safari iOS
+          });
+          const pdfDoc = await loadingTask.promise;
+          const allPagesLines = [];
+
+          for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
+            const page = await pdfDoc.getPage(pageNum);
+            const textContent = await page.getTextContent();
+            const items = textContent.items || [];
+            // Gom các phần tử chữ theo tọa độ Y (cùng một dòng ngang nếu chênh lệch Y <= 3.5pt)
+            const rows = [];
+            for (const item of items) {
+              const str = item.str || "";
+              if (!str) continue;
+              const tx = item.transform || [1, 0, 0, 1, 0, 0];
+              const x = tx[4] || 0;
+              const y = tx[5] || 0;
+              let matchedRow = rows.find(r => Math.abs(r.y - y) <= 3.8);
+              if (!matchedRow) {
+                matchedRow = { y, chunks: [] };
+                rows.push(matchedRow);
+              }
+              matchedRow.chunks.push({ x, w: item.width || 0, str });
+            }
+            // Sắp xếp dòng từ trên xuống dưới (Y giảm dần trong hệ tọa độ PDF)
+            rows.sort((a, b) => b.y - a.y);
+            for (const row of rows) {
+              row.chunks.sort((a, b) => a.x - b.x);
+              let lineStr = "";
+              let prevEnd = null;
+              for (const ch of row.chunks) {
+                if (prevEnd !== null) {
+                  const gap = ch.x - prevEnd;
+                  if (gap > 28) lineStr += "\t";
+                  else if (gap > 2.5 && !lineStr.endsWith(" ") && !ch.str.startsWith(" ")) lineStr += " ";
+                }
+                lineStr += ch.str;
+                prevEnd = ch.x + (ch.w || ch.str.length * 4.5);
+              }
+              if (lineStr.trim()) allPagesLines.push(lineStr.trim());
+            }
+          }
+          const finalPdfText = cleanAndNormalizeDocxText(allPagesLines.join("\n"));
+          if (finalPdfText.length > 10) return finalPdfText;
+        } catch (pdfErr) {
+          console.warn("PDF.js fallback:", pdfErr);
+        }
+      }
+
+      // Fallback Offline: Quét luồng văn bản PDF trực tiếp từ buffer (hỗ trợ cả FlateDecode qua DecompressionStream)
+      const u8 = new Uint8Array(arrayBuffer);
+      const latin1 = new TextDecoder("latin1").decode(u8);
+      const extractedChunks = [];
+      const streamRegex = /stream\r?\n([\s\S]*?)\r?\nendstream/g;
+      let m;
+      const utf8Dec = new TextDecoder("utf-8", { fatal: false });
+
+      while ((m = streamRegex.exec(latin1)) !== null) {
+        const rawStreamStr = m[1];
+        let contentStr = rawStreamStr;
+        if (typeof DecompressionStream !== "undefined" && rawStreamStr.length > 2) {
+          try {
+            const bytes = new Uint8Array(rawStreamStr.length);
+            for (let i = 0; i < rawStreamStr.length; i++) bytes[i] = rawStreamStr.charCodeAt(i) & 0xff;
+            const blob = new Blob([bytes]);
+            const ds = blob.stream().pipeThrough(new DecompressionStream("deflate"));
+            const decompBuf = await new Response(ds).arrayBuffer();
+            contentStr = utf8Dec.decode(decompBuf);
+          } catch {}
+        }
+        const tjMatches = contentStr.match(/\((?:\\.|[^\\()])+\)\s*Tj|\[(?:\\.|[^[\]])+\]\s*TJ/g);
+        if (tjMatches) {
+          for (const tj of tjMatches) {
+            const inner = [...tj.matchAll(/\((?:\\.|[^\\()])*\)/g)].map(x => x[0].slice(1, -1)).join("");
+            if (inner.trim()) extractedChunks.push(inner);
+          }
+        }
+      }
+
+      if (extractedChunks.length > 0) {
+        return cleanAndNormalizeDocxText(extractedChunks.join("\n"));
+      }
+      throw new Error("Không đọc được văn bản từ tệp PDF này (hãy bật mạng để nạp PDF.js hoặc kiểm tra xem file PDF có phải là ảnh scan không).");
+    }
+
+    function detectFileFormat(file, arrayBuffer) {
+      const name = String(file?.name || "").toLowerCase();
+      const type = String(file?.type || "").toLowerCase();
+      if (arrayBuffer && arrayBuffer.byteLength >= 4) {
+        const u8 = new Uint8Array(arrayBuffer, 0, 5);
+        // Magic bytes: %PDF- (0x25 0x50 0x44 0x46)
+        if (u8[0] === 0x25 && u8[1] === 0x50 && u8[2] === 0x44 && u8[3] === 0x46) return "pdf";
+        // Magic bytes: PK\x03\x04 (0x50 0x4B 0x03 0x04) -> ZIP / DOCX
+        if (u8[0] === 0x50 && u8[1] === 0x4B) return "docx";
+      }
+      if (name.endsWith(".pdf") || type.includes("pdf")) return "pdf";
+      return "docx";
+    }
+
+    async function readSingleDocxFast(file) {
+      const buffer = await readFileAsArrayBufferSafe(file);
+      const format = detectFileFormat(file, buffer);
+      if (format === "pdf") {
+        return await extractTextFromPdfBuffer(buffer);
+      }
+      let xmlString = "";
+      if (window.JSZip) {
+        try {
+          const zip = await window.JSZip.loadAsync(buffer);
+          const docFile = zip.file("word/document.xml");
+          if (docFile) xmlString = await docFile.async("string");
+        } catch (e) {
+          console.warn("JSZip fallback:", e);
+        }
+      }
+      if (!xmlString) {
+        xmlString = await extractDocxXmlNativeZeroCopy(buffer);
+      }
+      return cleanAndNormalizeDocxText(extractRichTextFromDocumentXml(xmlString));
+    }
+
+    // =========================================================================
+    // 3. UPLOAD HANDLER
+    // =========================================================================
+    let rafProgressId = null;
+    function updateUploadProgressUI(percent, statusMsg, metricMsg) {
+      if (rafProgressId) cancelAnimationFrame(rafProgressId);
+      rafProgressId = requestAnimationFrame(() => {
+        const sec = document.getElementById("uploadStatusSection");
+        sec.classList.remove("hidden");
+        document.getElementById("uploadProgressFill").style.width = `${Math.min(100, Math.max(0, percent))}%`;
+        if (statusMsg) document.getElementById("uploadStatusText").textContent = statusMsg;
+        if (metricMsg) document.getElementById("uploadSpeedMetric").textContent = metricMsg;
+      });
+    }
+
+    // Kiểm tra file hợp lệ (.docx hoặc .pdf) trên cả Máy tính, Android và iPhone
+    function isLikelyDocxFile(f) {
+      if (!f) return false;
+      const name = String(f.name || "").toLowerCase().trim();
+      const type = String(f.type || "").toLowerCase().trim();
+      if (name.endsWith(".docx") || name.includes(".docx") || name.endsWith(".pdf") || name.includes(".pdf")) return true;
+      if (type.includes("officedocument.wordprocessingml") || type.includes("application/pdf") || type.includes("application/zip") || type.includes("octet-stream")) return true;
+      if (!/\.(png|jpe?g|gif|webp|mp4|mp3|html?)$/i.test(name) && f.size > 100) return true;
+      return false;
+    }
+
+    async function handleDocxFilesUpload(fileList) {
+      // Sao chụp mảng File tĩnh ngay lập tức để không bị mất tham chiếu trên iOS
+      const files = Array.from(fileList || []);
+      if (files.length === 0) return;
+      const invalid = files.filter(f => !isLikelyDocxFile(f));
+      const valid = files.filter(f => isLikelyDocxFile(f));
+      if (invalid.length > 0) showToast(`Bỏ qua ${invalid.length} tệp không phải tài liệu .docx hoặc .pdf.`, "warning");
+      if (valid.length === 0) return;
+
+      const t0 = performance.now();
+      const appendMode = document.getElementById("chkAppendMode").checked;
+      updateUploadProgressUI(12, `Đang đọc & bóc tách an toàn ${valid.length} tệp (.docx/.pdf)...`, "12%");
+
+      try {
+        let completedFiles = 0;
+        const parsedPerFile = await Promise.all(valid.map(async file => {
+          const cleanText = await readSingleDocxFast(file);
+          completedFiles += 1;
+          const pct = 15 + Math.round((completedFiles / valid.length) * 65);
+          updateUploadProgressUI(pct, `Đã xử lý: ${file.name}`, `${pct}%`);
+          return { fileName: file.name, baseTopic: file.name.replace(/\.(docx|pdf)$/i, "").trim(), cleanText };
+        }));
+
+        updateUploadProgressUI(86, "Đang bóc tách & làm sạch câu hỏi...", "86%");
+        let nextQuestions = appendMode ? [...QUESTION_BANK] : [];
+        let nextLoadedFiles = appendMode ? [...state.loadedFiles] : [];
+        let totalNewAdded = 0;
+
+        for (const item of parsedPerFile) {
+          const startId = nextQuestions.length + 1;
+          const extracted = parseQuestionsFromCleanText(item.cleanText, item.baseTopic, startId);
+          nextQuestions = nextQuestions.concat(extracted);
+          totalNewAdded += extracted.length;
+          nextLoadedFiles.push({ name: item.fileName, count: extracted.length });
+        }
+
+        const elapsedMs = Math.max(1, Math.round(performance.now() - t0));
+        if (totalNewAdded === 0) {
+          updateUploadProgressUI(100, "Không tìm thấy câu hỏi trắc nghiệm hợp lệ.", "0 câu");
+          showToast("Không bóc tách được câu hỏi. Kiểm tra định dạng Câu 1 / A. B. C. D.", "error");
+          return;
+        }
+
+        QUESTION_BANK = nextQuestions;
+        state.loadedFiles = nextLoadedFiles;
+        state.topicFilter = "ALL";
+        state.onlyStarred = false;
+        state.searchQuery = "";
+
+        if (!appendMode) {
+          state.queueIds = QUESTION_BANK.map(q => q.id);
+          state.currentIndex = 0;
+          state.answered = {};
+          state.questionOptionOrders = {};
+          state.starredIds = [];
+          state.wrongStreakCount = 0;
+          state.pendingRetryIds = [];
+          state.showExplanationManual = {};
+        } else {
+          const existingSet = new Set(state.queueIds);
+          QUESTION_BANK.forEach(q => { if (!existingSet.has(q.id)) state.queueIds.push(q.id); });
+        }
+
+        updateUploadProgressUI(100, `Hoàn tất! ${totalNewAdded} câu an toàn từ ${valid.length} file`, `${elapsedMs}ms • ${QUESTION_BANK.length} câu`);
+        await saveState();
+        renderUploadScreen();
+        renderAll();
+        showToast(`Đã tạo ${totalNewAdded} câu hỏi sạch trong ${elapsedMs}ms! Bấm "Bắt đầu làm bài" để ôn tập.`, "success");
+        SecurityEngine.addAuditEntry('NẠP FILE THÀNH CÔNG', valid.map(f => f.name).join(', '), `Tạo ${totalNewAdded} câu hỏi an toàn`);
+      } catch (err) {
+        updateUploadProgressUI(100, `Lỗi: ${err.message}`, "Lỗi");
+        showToast(`Lỗi xử lý .docx: ${err.message}`, "error");
+      }
+    }
+
+    // =========================================================================
+    // 4. SAMPLE DECK LOADER
+    // =========================================================================
+    async function loadSampleQuestions() {
+      const sampleDeck = [
+        {
+          id: 1,
+          topic: "Bảo Mật & An Toàn",
+          question: "Tường lửa của ứng dụng bảo vệ dữ liệu người dùng khỏi các nguy cơ nào?",
+          options: {
+            a: "Chặn 100% rò rỉ dữ liệu ra máy chủ lạ, ngăn chặn tấn công XSS và mã hóa AES-GCM",
+            b: "Chỉ đổi mật khẩu máy tính của người dùng",
+            c: "Gửi toàn bộ câu hỏi lên đám mây công cộng",
+            d: "Tắt mạng Wi-Fi của toàn bộ hệ điều hành"
+          },
+          answer: "a",
+          explanation: "Hệ thống sở hữu tường lửa 4 lớp: CSP Policy, Proxy Shield chặn kết nối lạ, Sanitizer lọc độc XSS và Két sắt mã hóa AES-GCM 256-bit."
+        },
+        {
+          id: 2,
+          topic: "Tính năng Ngoại tuyến",
+          question: "Trang web này có thể hoạt động khi mất kết nối mạng (offline / không có Wi-Fi) không?",
+          options: {
+            a: "Chỉ chạy được khi có kết nối Wi-Fi liên tục",
+            b: "Hoạt động hoàn toàn bình thường 100% khi không có mạng",
+            c: "Chỉ xem được lịch sử, không giải nén được file",
+            d: "Bắt buộc phải kết nối server backend"
+          },
+          answer: "b",
+          explanation: "Trang web được thiết kế theo kiến trúc Offline-First: CSS viết tay, font hệ thống, bộ giải nén DecompressionStream phần cứng và AI nội bộ đều chạy ngay trên trình duyệt."
+        },
+        {
+          id: 3,
+          topic: "Phím tắt & Thao tác",
+          question: "Phím tắt nào trên bàn phím cho phép đánh dấu sao (lưu lại) câu hỏi hiện tại?",
+          options: {
+            a: "Phím cách (Space)",
+            b: "Phím E",
+            c: "Phím S",
+            d: "Phím Enter"
+          },
+          answer: "c",
+          explanation: "Nhấn phím S để bật/tắt đánh dấu sao câu hỏi. Nhấn E để xem lời giải thích; các phím 1-4 hoặc A-D để chọn đáp án."
+        }
+      ];
+      QUESTION_BANK = sampleDeck;
+      state.loadedFiles = [{ name: "Đề mẫu bảo mật.docx", count: sampleDeck.length }];
+      state.queueIds = sampleDeck.map(q => q.id);
+      state.currentIndex = 0;
+      state.answered = {};
+      state.starredIds = [];
+      state.pendingRetryIds = [];
+      await saveState();
+      switchScreen("study");
+      renderAll();
+      showToast("Đã nạp 3 câu hỏi mẫu! Bạn có thể trải nghiệm làm bài ngay.", "success");
+    }
+
+    // =========================================================================
+    // 5. TOAST & NOTIFICATION
+    // =========================================================================
+    function showToast(message, type = "info") {
+      const container = document.getElementById("toastContainer");
+      const toast = document.createElement("div");
+      toast.className = `toast toast-${type}`;
+      toast.textContent = message;
+      container.appendChild(toast);
+      setTimeout(() => {
+        toast.style.opacity = "0";
+        toast.style.transition = "opacity .25s ease";
+        setTimeout(() => toast.remove(), 260);
+      }, 2800);
+      if (navigator.vibrate) {
+        if (type === "success") navigator.vibrate(50);
+        else if (type === "error") navigator.vibrate([30, 50, 30]);
+      }
+    }
+
+    // =========================================================================
+    // 6. SANITIZATION & UTILITIES
+    // =========================================================================
+    function sanitizeHtml(raw) {
+      if (typeof raw !== 'string') return '';
+      return raw
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;')
+        .replace(/javascript\s*:/gi, 'blocked:')
+        .replace(/vbscript\s*:/gi, 'blocked:')
+        .replace(/data\s*:\s*text\/html/gi, 'blocked:');
+    }
+
+    function renderSafeMarkdown(text) {
+      let safe = sanitizeHtml(text);
+      safe = safe.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+      safe = safe.replace(/\n/g, '<br>');
+      return safe;
+    }
+
+    function escapeHtml(str) {
+      return sanitizeHtml(String(str || ''));
+    }
+
+    function shuffleArray(arr) {
+      const c = [...arr];
+      for (let i = c.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [c[i], c[j]] = [c[j], c[i]];
+      }
+      return c;
+    }
+    function getQuestionById(id) {
+      return QUESTION_BANK.find(q => q.id === id) || QUESTION_BANK[0] || null;
+    }
+    function getFilteredQueue() {
+      if (QUESTION_BANK.length === 0) return [];
+      const qText = state.searchQuery.trim().toLowerCase();
+      return state.queueIds.filter(id => {
+        const q = getQuestionById(id);
+        if (!q) return false;
+        if (state.topicFilter !== "ALL" && q.topic !== state.topicFilter) return false;
+        if (state.onlyStarred && !state.starredIds.includes(q.id)) return false;
+        if (qText) {
+          const matchNum = String(q.id) === qText || `câu ${q.id}`.includes(qText);
+          const matchBody = q.question.toLowerCase().includes(qText) || q.topic.toLowerCase().includes(qText);
+          const matchOpts = Object.values(q.options).some(v => v.toLowerCase().includes(qText));
+          if (!matchNum && !matchBody && !matchOpts) return false;
+        }
+        return true;
+      });
+    }
+    function getOptionOrder(q) {
+      if (Array.isArray(state.questionOptionOrders[q.id]) && state.questionOptionOrders[q.id].length === 4) {
+        return state.questionOptionOrders[q.id];
+      }
+      return ["a", "b", "c", "d"];
+    }
+
+    // =========================================================================
+    // 7. SCREEN SWITCHER
+    // =========================================================================
+    function switchScreen(screenId) {
+      state.currentScreen = screenId;
+      document.getElementById("screenUpload").classList.toggle("active", screenId === "upload");
+      document.getElementById("screenStudy").classList.toggle("active", screenId === "study");
+      document.getElementById("navUpload").classList.toggle("active", screenId === "upload");
+      document.getElementById("navStudy").classList.toggle("active", screenId === "study");
+
+      document.getElementById("studyModeSwitch").style.display = screenId === "study" ? "inline-flex" : "none";
+      const mobileNav = document.getElementById("navBarMobile");
+      mobileNav.style.display = screenId === "study" ? "" : "none";
+      if (screenId === "study") renderAll();
+      saveState();
+    }
+
+    // =========================================================================
+    // 8. RENDER FUNCTIONS
+    // =========================================================================
+    function renderUploadScreen() {
+      const strip = document.getElementById("loadedFilesStrip");
+      const startBtn = document.getElementById("btnStartStudy");
+      const countEl = document.getElementById("startStudyCount");
+      if (state.loadedFiles.length > 0 && QUESTION_BANK.length > 0) {
+        strip.classList.remove("hidden");
+        const frag = document.createDocumentFragment();
+        state.loadedFiles.forEach(item => {
+          const badge = document.createElement("span");
+          badge.className = "loaded-file-badge";
+          badge.textContent = `📄 ${item.name} (${item.count} câu)`;
+          frag.appendChild(badge);
+        });
+        strip.replaceChildren(frag);
+        startBtn.classList.remove("hidden");
+        countEl.textContent = QUESTION_BANK.length;
+      } else {
+        strip.classList.add("hidden");
+        strip.innerHTML = "";
+        startBtn.classList.add("hidden");
+      }
+    }
+
+    function renderTopicChips() {
+      const container = document.getElementById("topicFilterChips");
+      const frag = document.createDocumentFragment();
+      if (QUESTION_BANK.length === 0) {
+        const emptyChip = document.createElement("span");
+        emptyChip.style.cssText = "font-size:12px;color:var(--text-muted)";
+        emptyChip.textContent = "Chưa có chuyên đề — hãy tải file .docx.";
+        frag.appendChild(emptyChip);
+        container.replaceChildren(frag);
+        return;
+      }
+      const topics = ["ALL", ...new Set(QUESTION_BANK.map(q => q.topic))];
+      topics.forEach(topic => {
+        const btn = document.createElement("button");
+        btn.className = `filter-chip${state.topicFilter === topic ? " active" : ""}`;
+        btn.textContent = topic === "ALL" ? `Tất cả (${QUESTION_BANK.length})` : topic;
+        btn.addEventListener("click", () => {
+          state.topicFilter = topic;
+          state.currentIndex = 0;
+          saveState();
+          renderAll();
+        });
+        frag.appendChild(btn);
+      });
+      container.replaceChildren(frag);
+    }
+
+    function renderStats() {
+      const total = QUESTION_BANK.length;
+      const answeredIds = Object.keys(state.answered).filter(k => QUESTION_BANK.some(q => String(q.id) === String(k)));
+      const answeredCount = answeredIds.length;
+      const correctCount = answeredIds.filter(k => state.answered[k]?.isCorrect).length;
+      const wrongCount = answeredCount - correctCount;
+      const percent = total > 0 ? Math.round((answeredCount / total) * 100) : 0;
+      const accuracy = answeredCount > 0 ? Math.round((correctCount / answeredCount) * 100) : 0;
+
+      document.getElementById("statCorrect").textContent = String(correctCount);
+      document.getElementById("statAccuracy").textContent = `Chính xác: ${accuracy}%`;
+      document.getElementById("statWrong").textContent = String(wrongCount);
+      document.getElementById("statRetryQueue").textContent = `Chờ ôn lại: ${state.pendingRetryIds.length}`;
+      document.getElementById("statStarred").textContent = String(state.starredIds.length);
+      document.getElementById("statProgressText").textContent = `${answeredCount}/${total}`;
+      document.getElementById("statPercentText").textContent = `${percent}%`;
+
+      document.getElementById("topProgressFill").style.width = `${percent}%`;
+
+      if (total > 0 && state.loadedFiles.length > 0) {
+        const names = state.loadedFiles.map(f => f.name).join(", ");
+        document.getElementById("headerTitle").textContent = `${total} Câu — ${names}`;
+      } else {
+        document.getElementById("headerTitle").textContent = "Ôn Tập Trắc Nghiệm Thông Minh";
+      }
+
+      const btnQuiz = document.getElementById("btnModeQuiz");
+      const btnStudy = document.getElementById("btnModeStudy");
+      btnQuiz.classList.toggle("active", state.mode === "quiz");
+      btnStudy.classList.toggle("active", state.mode !== "quiz");
+
+      const hasKey = Boolean(getGeminiApiKey());
+      document.getElementById("aiStatusLabel").textContent = hasKey ? "Gemini" : "AI";
+      document.getElementById("aiModeCaption").textContent = hasKey
+        ? "Gemini API (kết nối kiểm duyệt) + dự phòng nội bộ"
+        : "AI Nội bộ (offline — 100% không gửi dữ liệu ra ngoài)";
+    }
+
+    function renderQuestionView() {
+      if (QUESTION_BANK.length === 0) {
+        document.getElementById("qBadgeNumber").textContent = "Chờ đề";
+        document.getElementById("qBadgeTopic").textContent = "Chưa nạp";
+        document.getElementById("qBadgeRetry").classList.add("hidden");
+        document.getElementById("qCounterPos").textContent = "0 / 0";
+        document.getElementById("questionText").textContent = "Hãy quay lại màn hình Nạp đề để tải file .docx hoặc nạp bộ đề mẫu.";
+        document.getElementById("optionsContainer").innerHTML = "";
+        document.getElementById("explanationBox").classList.add("hidden");
+        return;
+      }
+      const filtered = getFilteredQueue();
+      if (filtered.length === 0) {
+        document.getElementById("qBadgeNumber").textContent = "Trống";
+        document.getElementById("qBadgeTopic").textContent = "Bộ lọc";
+        document.getElementById("qCounterPos").textContent = "0 / 0";
+        document.getElementById("questionText").textContent = "Không tìm thấy câu hỏi nào khớp bộ lọc.";
+        document.getElementById("optionsContainer").innerHTML = `<div style="padding:16px;border-radius:var(--radius-md);background:var(--bg-card-alt);font-size:13px;color:var(--text-secondary);">Bấm <button id="btnResetFilterEmpty" style="color:var(--accent);font-weight:600;background:none;border:none;cursor:pointer;text-decoration:underline;">Tất cả</button> để hiển thị lại ${QUESTION_BANK.length} câu.</div>`;
+        document.getElementById("explanationBox").classList.add("hidden");
+        const btnE = document.getElementById("btnResetFilterEmpty");
+        if (btnE) {
+          btnE.addEventListener("click", () => {
+            state.topicFilter = "ALL";
+            state.onlyStarred = false;
+            state.searchQuery = "";
+            document.getElementById("searchInput").value = "";
+            state.currentIndex = 0;
+            saveState();
+            renderAll();
+          });
+        }
+        return;
+      }
+      if (state.currentIndex >= filtered.length) state.currentIndex = 0;
+      const currentId = filtered[state.currentIndex];
+      const q = getQuestionById(currentId);
+      const ansRecord = state.answered[q.id];
+      const isStarred = state.starredIds.includes(q.id);
+      const optionOrder = getOptionOrder(q);
+      const letters = ["A", "B", "C", "D"];
+
+      document.getElementById("qBadgeNumber").textContent = `Câu ${q.id}`;
+      document.getElementById("qBadgeTopic").textContent = q.topic;
+      document.getElementById("qCounterPos").textContent = `${state.currentIndex + 1} / ${filtered.length}`;
+
+      const retryBadge = document.getElementById("qBadgeRetry");
+      const occurrencesBefore = filtered.slice(0, state.currentIndex).filter(x => x === q.id).length;
+      retryBadge.classList.toggle("hidden", !(occurrencesBefore > 0 || (ansRecord && !ansRecord.isCorrect)));
+
+      const starIcon = document.getElementById("starIcon");
+      const starIconMobile = document.getElementById("starIconMobile");
+      const starLabel = document.getElementById("starLabel");
+      starIcon.setAttribute("fill", isStarred ? "currentColor" : "none");
+      starIconMobile.setAttribute("fill", isStarred ? "currentColor" : "none");
+      const starBtn = document.getElementById("btnStarQuestion");
+      const starBtnMobile = document.getElementById("btnStarMobile");
+      if (isStarred) {
+        starBtn.style.color = "var(--warning)";
+        starBtnMobile.style.color = "var(--warning)";
+        starLabel.textContent = "Đã sao";
+      } else {
+        starBtn.style.color = "";
+        starBtnMobile.style.color = "";
+        starLabel.textContent = "Sao";
+      }
+
+      document.getElementById("questionText").textContent = q.question;
+
+      const optionsContainer = document.getElementById("optionsContainer");
+      const optFrag = document.createDocumentFragment();
+      const revealAnswer = Boolean(ansRecord) || state.mode === "study";
+
+      optionOrder.forEach((origKey, idx) => {
+        const displayLabel = letters[idx];
+        const optContent = q.options[origKey];
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.dataset.origKey = origKey;
+
+        let cardClass = "option-card";
+        if (revealAnswer) {
+          if (origKey === q.answer) cardClass += " correct answered";
+          else if (ansRecord && ansRecord.selectedKey === origKey && origKey !== q.answer) cardClass += " wrong answered";
+          else cardClass += " dimmed answered";
+        }
+        btn.className = cardClass;
+
+        let tagHtml = "";
+        if (revealAnswer && origKey === q.answer) tagHtml = `<span class="option-tag correct-tag">✓ Đúng</span>`;
+        if (revealAnswer && ansRecord && ansRecord.selectedKey === origKey && origKey !== q.answer) tagHtml = `<span class="option-tag wrong-tag">✗ Bạn chọn</span>`;
+
+        btn.innerHTML = `<span class="option-letter">${displayLabel}</span><span class="option-text">${escapeHtml(optContent)}</span>${tagHtml}`;
+        btn.addEventListener("click", () => handleSelectOption(q, origKey, optionOrder));
+        optFrag.appendChild(btn);
+      });
+      optionsContainer.replaceChildren(optFrag);
+
+      const expBox = document.getElementById("explanationBox");
+      const shouldShowExp = Boolean(state.showExplanationManual[q.id]) || revealAnswer;
+      const correctDisplayIdx = optionOrder.indexOf(q.answer);
+      const correctDisplayLetter = correctDisplayIdx >= 0 ? letters[correctDisplayIdx] : q.answer.toUpperCase();
+      document.getElementById("correctAnswerSummary").textContent = `${correctDisplayLetter} — ${q.options[q.answer]}`;
+      document.getElementById("explanationText").textContent = q.explanation;
+      expBox.classList.toggle("hidden", !shouldShowExp);
+
+      const card = document.getElementById("questionCard");
+      card.classList.remove("animate-in");
+      void card.offsetWidth;
+      card.classList.add("animate-in");
+    }
+
+    function renderMatrixGrid() {
+      const grid = document.getElementById("questionMatrixGrid");
+      const filtered = getFilteredQueue();
+      const activeId = filtered.length > 0 ? filtered[Math.min(state.currentIndex, filtered.length - 1)] : null;
+      document.getElementById("matrixCountLabel").textContent = `${filtered.length} câu`;
+      const frag = document.createDocumentFragment();
+      if (QUESTION_BANK.length === 0) {
+        const emptyNote = document.createElement("div");
+        emptyNote.style.cssText = "grid-column:1/-1;text-align:center;padding:24px 0;font-size:12px;color:var(--text-muted);";
+        emptyNote.textContent = "Ma trận sẽ hiển thị khi có đề.";
+        frag.appendChild(emptyNote);
+        grid.replaceChildren(frag);
+        return;
+      }
+
+      const matrixFilter = state.matrixFilter || "all";
+      const displayQuestions = QUESTION_BANK.filter(q => {
+        if (matrixFilter === "unanswered") return !state.answered[q.id];
+        if (matrixFilter === "wrong") return state.answered[q.id] && !state.answered[q.id].isCorrect;
+        if (matrixFilter === "starred") return state.starredIds.includes(q.id);
+        return true;
+      });
+
+      displayQuestions.forEach(q => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        const ans = state.answered[q.id];
+        const isStar = state.starredIds.includes(q.id);
+        const isCurrent = q.id === activeId;
+        let cls = "matrix-btn";
+        if (isCurrent) cls += " current";
+        else if (ans) cls += ans.isCorrect ? " q-correct" : " q-wrong";
+        else if (isStar) cls += " q-starred";
+        btn.className = cls;
+        btn.textContent = String(q.id);
+        btn.title = `Câu ${q.id} — ${q.topic}`;
+        btn.addEventListener("click", () => {
+          const idxInFiltered = filtered.indexOf(q.id);
+          if (idxInFiltered >= 0) state.currentIndex = idxInFiltered;
+          else {
+            state.topicFilter = "ALL";
+            state.onlyStarred = false;
+            state.searchQuery = "";
+            document.getElementById("searchInput").value = "";
+            const idxAll = state.queueIds.indexOf(q.id);
+            state.currentIndex = idxAll >= 0 ? idxAll : 0;
+          }
+          saveState();
+          renderAll();
+        });
+        frag.appendChild(btn);
+      });
+      grid.replaceChildren(frag);
+    }
+
+    function renderAll() {
+      renderTopicChips();
+      renderStats();
+      renderQuestionView();
+      renderMatrixGrid();
+      updateVaultUI();
+    }
+
+    // =========================================================================
+    // 9. INTERACTIONS & ANSWER HANDLING
+    // =========================================================================
+    function handleSelectOption(q, origKey, optionOrder) {
+      const isCorrect = origKey === q.answer;
+      const firstTimeAnswering = !state.answered[q.id];
+      state.answered[q.id] = { selectedKey: origKey, isCorrect, optionOrder };
+      state.showExplanationManual[q.id] = true;
+
+      if (firstTimeAnswering) {
+        if (!isCorrect) {
+          state.wrongStreakCount += 1;
+          if (!state.pendingRetryIds.includes(q.id)) state.pendingRetryIds.push(q.id);
+          showToast(`Chưa đúng! Đáp án: ${q.answer.toUpperCase()}.`, "error");
+        } else {
+          showToast(`Chính xác! Câu ${q.id} đã ghi nhận.`, "success");
+        }
+      } else {
+        showToast(isCorrect ? "Đáp án chính xác!" : `Đáp án: ${q.answer.toUpperCase()}.`, isCorrect ? "success" : "warning");
+      }
+
+      if (state.wrongStreakCount >= 5 && state.pendingRetryIds.length > 0) {
+        const retryId = state.pendingRetryIds.shift();
+        state.wrongStreakCount = 0;
+        const insertPos = Math.min(state.currentIndex + 1, state.queueIds.length);
+        state.queueIds.splice(insertPos, 0, retryId);
+        showToast(`Đã chèn Câu ${retryId} (sai) vào lượt ôn lại!`, "warning");
+      }
+      saveState();
+      renderAll();
+
+      if (state.autoAdvance && firstTimeAnswering) {
+        setTimeout(goNextQuestion, 600);
+      }
+    }
+
+    function goNextQuestion() {
+      const filtered = getFilteredQueue();
+      if (filtered.length === 0) return;
+      state.currentIndex = (state.currentIndex + 1) % filtered.length;
+      saveState();
+      renderAll();
+    }
+    function goPrevQuestion() {
+      const filtered = getFilteredQueue();
+      if (filtered.length === 0) return;
+      state.currentIndex = (state.currentIndex - 1 + filtered.length) % filtered.length;
+      saveState();
+      renderAll();
+    }
+    function toggleStarCurrent() {
+      const filtered = getFilteredQueue();
+      if (filtered.length === 0) return;
+      const qId = filtered[state.currentIndex];
+      const pos = state.starredIds.indexOf(qId);
+      if (pos >= 0) {
+        state.starredIds.splice(pos, 1);
+        showToast(`Bỏ sao Câu ${qId}.`, "info");
+      } else {
+        state.starredIds.push(qId);
+        showToast(`Đánh dấu sao Câu ${qId}!`, "success");
+      }
+      saveState();
+      renderAll();
+    }
+    function shuffleQuestionsAndOptions() {
+      if (QUESTION_BANK.length === 0) { showToast("Hãy tải file .docx trước!", "warning"); return; }
+      state.queueIds = shuffleArray(QUESTION_BANK.map(q => q.id));
+      const orders = {};
+      QUESTION_BANK.forEach(q => { orders[q.id] = shuffleArray(["a", "b", "c", "d"]); });
+      state.questionOptionOrders = orders;
+      state.currentIndex = 0;
+      saveState();
+      renderAll();
+      showToast(`Đã đảo ngẫu nhiên ${QUESTION_BANK.length} câu & đáp án!`, "success");
+    }
+    async function resetSession() {
+      if (QUESTION_BANK.length === 0) return;
+      const currentMode = state.mode;
+      const savedQuestions = [...QUESTION_BANK];
+      const savedFiles = [...state.loadedFiles];
+      state = {
+        ...structuredClone(defaultState),
+        mode: currentMode,
+        currentScreen: "study",
+        loadedFiles: savedFiles,
+        questions: savedQuestions,
+        queueIds: savedQuestions.map(q => q.id)
+      };
+      await saveState();
+      renderAll();
+      showToast("Đã đặt lại kết quả (giữ nguyên bộ đề).", "info");
+    }
+    async function clearAllLoadedDeck() {
+      const currentMode = state.mode;
+      QUESTION_BANK = [];
+      state = { ...structuredClone(defaultState), mode: currentMode };
+      document.getElementById("uploadStatusSection").classList.add("hidden");
+      document.getElementById("docxFileInput").value = "";
+      await saveState();
+      renderUploadScreen();
+      renderAll();
+      showToast("Đã xóa toàn bộ bộ đề.", "info");
+    }
+
+    // =========================================================================
+    // 10. AI (Gemini API + Local Offline Fallback)
+    // =========================================================================
+    function appendChatMessage(role, text, badgeText = "") {
+      const box = document.getElementById("aiChatMessages");
+      const wrap = document.createElement("div");
+      const isUser = role === "user";
+      wrap.className = `ai-msg ${isUser ? "user-msg" : "bot-msg"}`;
+      const safeHtml = renderSafeMarkdown(text);
+      wrap.innerHTML = `${badgeText ? `<div class="ai-msg-label">${escapeHtml(badgeText)}</div>` : ""}<div>${safeHtml}</div>`;
+      box.appendChild(wrap);
+      box.scrollTop = box.scrollHeight;
+    }
+
+    function buildLocalAiReply(userPrompt, currentQ) {
+      if (!currentQ) return "Bạn chưa tải tài liệu **.docx** nào. Hãy tải file lên trước!";
+      const qNum = currentQ.id;
+      const qTopic = currentQ.topic;
+      const qBody = currentQ.question;
+      const ansKey = currentQ.answer.toUpperCase();
+      const ansText = currentQ.options[currentQ.answer];
+      const exp = currentQ.explanation;
+      const lower = userPrompt.toLowerCase();
+      if (lower.includes("ví dụ") || lower.includes("thực tiễn"))
+        return `**Ví dụ thực tiễn "${qTopic}" (Câu ${qNum}):**\nĐáp án: **${ansKey} (${ansText})**.\n• **Cơ sở:** ${exp}\n• **Cách vận dụng:** Xác định từ khóa trọng tâm, đối chiếu với nguyên tắc của đáp án **${ansKey}** để loại trừ phương án nhiễu.`;
+      if (lower.includes("mẹo") || lower.includes("nhớ") || lower.includes("nhầm"))
+        return `**Mẹo ghi nhớ — ${qTopic}:**\n1. Đọc kỹ yêu cầu (đúng/sai/ngoại lệ).\n2. Loại trừ phương án tuyệt đối hóa.\n3. Ghi nhớ: **${ansKey}: ${ansText}**.`;
+      return `**Phân tích Câu ${qNum} (${qTopic}):**\n• **Câu hỏi:** ${qBody}\n• **Đáp án:** **${ansKey} — ${ansText}**\n• **Lý giải:** ${exp}`;
+    }
+
+    async function callGeminiWithBackoff(promptText, currentQ) {
+      const apiKey = getGeminiApiKey();
+      if (!apiKey) return { text: buildLocalAiReply(promptText, currentQ), source: "AI Nội bộ" };
+      const systemInstruction = "Bạn là chuyên gia phân tích đề thi trắc nghiệm Việt Nam. Giải thích rõ ràng, súc tích bằng tiếng Việt.";
+      const contextPart = currentQ ? `\n[Câu ${currentQ.id} (${currentQ.topic}) - "${currentQ.question}" | A: ${currentQ.options.a} | B: ${currentQ.options.b} | C: ${currentQ.options.c} | D: ${currentQ.options.d} | Đáp án: ${currentQ.answer.toUpperCase()}]` : "";
+      const payload = {
+        contents: [{ parts: [{ text: `${promptText}${contextPart}` }] }],
+        systemInstruction: { parts: [{ text: systemInstruction }] }
+      };
+      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
+      const delays = [1000, 2000, 4000];
+      for (let attempt = 0; attempt <= delays.length; attempt++) {
+        try {
+          const response = await fetch(apiUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+          });
+          if (!response.ok) {
+            if ((response.status === 429 || response.status >= 500) && attempt < delays.length) {
+              await new Promise(r => setTimeout(r, delays[attempt]));
+              continue;
+            }
+            throw new Error(`HTTP ${response.status}`);
+          }
+          const data = await response.json();
+          const candidateText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (candidateText) return { text: candidateText.trim(), source: "Gemini AI" };
+          throw new Error("Empty");
+        } catch (err) {
+          if (attempt < delays.length) await new Promise(r => setTimeout(r, delays[attempt]));
+          else return { text: buildLocalAiReply(promptText, currentQ), source: "AI Nội bộ (tự chuyển)" };
+        }
+      }
+      return { text: buildLocalAiReply(promptText, currentQ), source: "AI Nội bộ" };
+    }
+
+    async function sendAiPrompt(promptText) {
+      const trimmed = promptText.trim();
+      if (!trimmed) return;
+      const filtered = getFilteredQueue();
+      const currentQ = filtered.length > 0 ? getQuestionById(filtered[state.currentIndex]) : null;
+      appendChatMessage("user", trimmed, "Bạn");
+      const btnSend = document.getElementById("btnSendAi");
+      btnSend.disabled = true;
+      btnSend.textContent = "...";
+      const result = await callGeminiWithBackoff(trimmed, currentQ);
+      appendChatMessage("assistant", result.text, result.source);
+      btnSend.disabled = false;
+      btnSend.textContent = "Gửi";
+    }
+
+    // =========================================================================
+    // 11. AI DRAWER
+    // =========================================================================
+    function openAIDrawer() {
+      document.getElementById("aiOverlay").classList.add("open");
+      document.getElementById("aiDrawer").classList.add("open");
+    }
+    function closeAIDrawer() {
+      document.getElementById("aiOverlay").classList.remove("open");
+      document.getElementById("aiDrawer").classList.remove("open");
+    }
+
+    // =========================================================================
+    // 12. SWIPE GESTURES
+    // =========================================================================
+    function initSwipeGestures() {
+      const questionCard = document.getElementById("questionCard");
+      let touchStartX = 0;
+      let touchStartY = 0;
+      let isSwiping = false;
+      questionCard.addEventListener("touchstart", e => {
+        touchStartX = e.changedTouches[0].clientX;
+        touchStartY = e.changedTouches[0].clientY;
+        isSwiping = true;
+      }, { passive: true });
+      questionCard.addEventListener("touchend", e => {
+        if (!isSwiping) return;
+        isSwiping = false;
+        const dx = e.changedTouches[0].clientX - touchStartX;
+        const dy = e.changedTouches[0].clientY - touchStartY;
+        if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+          if (dx < 0) goNextQuestion();
+          else goPrevQuestion();
+        }
+      }, { passive: true });
+    }
+
+    // =========================================================================
+    // 13. EVENT BINDINGS
+    // =========================================================================
+    async function handlePastedRawText() {
+      const ta = document.getElementById("pasteRawTextarea");
+      const raw = (ta ? ta.value : "").trim();
+      if (!raw) {
+        showToast("Hãy dán nội dung đề thi vào khung trống trước!", "warning");
+        return;
+      }
+      const appendMode = document.getElementById("chkAppendMode").checked;
+      const cleanText = cleanAndNormalizeDocxText(raw);
+      const startId = appendMode ? QUESTION_BANK.length + 1 : 1;
+      const extracted = parseQuestionsFromCleanText(cleanText, "Đề dán trực tiếp", startId);
+      if (extracted.length === 0) {
+        showToast("Không tìm thấy câu hỏi (định dạng Câu 1. ... A. ... B. ...).", "error");
+        return;
+      }
+      QUESTION_BANK = appendMode ? QUESTION_BANK.concat(extracted) : extracted;
+      state.loadedFiles = appendMode
+        ? [...state.loadedFiles, { name: "Văn bản dán trực tiếp", count: extracted.length }]
+        : [{ name: "Văn bản dán trực tiếp", count: extracted.length }];
+      state.queueIds = QUESTION_BANK.map(q => q.id);
+      if (!appendMode) {
+        state.currentIndex = 0;
+        state.answered = {};
+        state.questionOptionOrders = {};
+        state.starredIds = [];
+        state.wrongStreakCount = 0;
+        state.pendingRetryIds = [];
+      }
+      if (ta) ta.value = "";
+      document.getElementById("pasteTextSection").classList.add("hidden");
+      await saveState();
+      renderUploadScreen();
+      renderAll();
+      showToast(`Đã tạo ${extracted.length} câu hỏi từ văn bản đã dán!`, "success");
+    }
+
+    function bindEvents() {
+      const fileInput = document.getElementById("docxFileInput");
+      const dropzone = document.getElementById("docxDropzone");
+
+      // QUAN TRỌNG CHO IPHONE / IOS:
+      // 1. Sao chụp mảng File tĩnh trước khi xử lý bất đồng bộ.
+      // 2. Chỉ đặt lại fileInput.value = "" SAU KHI await handleDocxFilesUpload đã đọc xong 100% dữ liệu.
+      // (Việc xóa fileInput.value sớm khi FileReader đang đọc là nguyên nhân gây lỗi "Không thể đọc tệp trên thiết bị này" trên iOS!)
+      fileInput.addEventListener("change", async e => {
+        const selectedFiles = e.target.files ? Array.from(e.target.files) : [];
+        if (selectedFiles.length > 0) {
+          try {
+            await handleDocxFilesUpload(selectedFiles);
+          } finally {
+            try { fileInput.value = ""; } catch {}
+          }
+        }
+      });
+
+      const btnTogglePaste = document.getElementById("btnTogglePasteBox");
+      if (btnTogglePaste) {
+        btnTogglePaste.addEventListener("click", () => {
+          document.getElementById("pasteTextSection").classList.toggle("hidden");
+        });
+      }
+      const btnCancelPaste = document.getElementById("btnCancelPaste");
+      if (btnCancelPaste) {
+        btnCancelPaste.addEventListener("click", () => {
+          document.getElementById("pasteTextSection").classList.add("hidden");
+        });
+      }
+      const btnParsePaste = document.getElementById("btnParsePastedText");
+      if (btnParsePaste) {
+        btnParsePaste.addEventListener("click", handlePastedRawText);
+      }
+
+      ["dragenter", "dragover"].forEach(evt => dropzone.addEventListener(evt, e => {
+        e.preventDefault(); e.stopPropagation(); dropzone.classList.add("active");
+      }));
+      ["dragleave", "drop"].forEach(evt => dropzone.addEventListener(evt, e => {
+        e.preventDefault(); e.stopPropagation(); dropzone.classList.remove("active");
+      }));
+      dropzone.addEventListener("drop", e => {
+        if (e.dataTransfer?.files?.length > 0) handleDocxFilesUpload(e.dataTransfer.files);
+      });
+
+      document.getElementById("btnClearAllQuestions").addEventListener("click", clearAllLoadedDeck);
+      document.getElementById("btnLoadSample").addEventListener("click", loadSampleQuestions);
+      document.getElementById("btnStartStudy").addEventListener("click", () => switchScreen("study"));
+      document.getElementById("btnBackToUpload").addEventListener("click", () => switchScreen("upload"));
+
+      // Screen navigation
+      document.getElementById("navUpload").addEventListener("click", () => switchScreen("upload"));
+      document.getElementById("navStudy").addEventListener("click", () => {
+        if (QUESTION_BANK.length === 0) {
+          showToast("Chưa có đề. Bạn có thể bấm 'Nạp đề mẫu thử ngay'!", "warning");
+          return;
+        }
+        switchScreen("study");
+      });
+
+      // Modes
+      document.getElementById("btnModeQuiz").addEventListener("click", () => {
+        state.mode = "quiz"; saveState(); renderAll(); showToast("Chế độ Làm bài.", "info");
+      });
+      document.getElementById("btnModeStudy").addEventListener("click", () => {
+        state.mode = "study"; saveState(); renderAll(); showToast("Chế độ Học nhanh (hiện đáp án).", "success");
+      });
+
+      // Filter Starred
+      document.getElementById("btnFilterStarred").addEventListener("click", () => {
+        state.onlyStarred = !state.onlyStarred;
+        state.currentIndex = 0;
+        saveState();
+        renderAll();
+        showToast(state.onlyStarred ? "Đang lọc câu có sao." : "Tắt lọc sao.", "info");
+      });
+
+      // Search
+      document.getElementById("searchInput").addEventListener("input", e => {
+        state.searchQuery = e.target.value;
+        state.currentIndex = 0;
+        saveState();
+        renderAll();
+      });
+      document.getElementById("btnClearFilter").addEventListener("click", () => {
+        state.topicFilter = "ALL";
+        state.onlyStarred = false;
+        state.searchQuery = "";
+        document.getElementById("searchInput").value = "";
+        state.currentIndex = 0;
+        saveState();
+        renderAll();
+        showToast(`Hiển thị toàn bộ ${QUESTION_BANK.length} câu.`, "info");
+      });
+
+      // Tools
+      document.getElementById("btnShuffleAll").addEventListener("click", shuffleQuestionsAndOptions);
+      document.getElementById("btnResetSession").addEventListener("click", resetSession);
+
+      // Question nav
+      document.getElementById("btnStarQuestion").addEventListener("click", toggleStarCurrent);
+      document.getElementById("btnPrevQuestion").addEventListener("click", goPrevQuestion);
+      document.getElementById("btnNextQuestion").addEventListener("click", goNextQuestion);
+      document.getElementById("btnToggleExplanation").addEventListener("click", () => {
+        const filtered = getFilteredQueue();
+        if (filtered.length === 0) return;
+        const qId = filtered[state.currentIndex];
+        state.showExplanationManual[qId] = !state.showExplanationManual[qId];
+        saveState();
+        renderQuestionView();
+      });
+
+      // Mobile nav
+      document.getElementById("btnPrevMobile").addEventListener("click", goPrevQuestion);
+      document.getElementById("btnNextMobile").addEventListener("click", goNextQuestion);
+      document.getElementById("btnStarMobile").addEventListener("click", toggleStarCurrent);
+      document.getElementById("btnExplainMobile").addEventListener("click", () => {
+        const filtered = getFilteredQueue();
+        if (filtered.length === 0) return;
+        const qId = filtered[state.currentIndex];
+        state.showExplanationManual[qId] = !state.showExplanationManual[qId];
+        saveState();
+        renderQuestionView();
+      });
+
+      // AI
+      document.getElementById("btnOpenAI").addEventListener("click", openAIDrawer);
+      document.getElementById("btnCloseAI").addEventListener("click", closeAIDrawer);
+      document.getElementById("aiOverlay").addEventListener("click", closeAIDrawer);
+      document.getElementById("btnAskAiAboutQuestion").addEventListener("click", () => {
+        const filtered = getFilteredQueue();
+        if (filtered.length === 0) { showToast("Hãy tải file .docx trước!", "warning"); return; }
+        const q = getQuestionById(filtered[state.currentIndex]);
+        openAIDrawer();
+        sendAiPrompt(`Giải thích chi tiết Câu ${q.id} (${q.topic}) và phân tích từng phương án.`);
+      });
+      document.querySelectorAll(".ai-quick-btn").forEach(btn => {
+        btn.addEventListener("click", () => sendAiPrompt(btn.dataset.aiPrompt || ""));
+      });
+      document.getElementById("aiChatForm").addEventListener("submit", e => {
+        e.preventDefault();
+        const input = document.getElementById("aiChatInput");
+        const val = input.value;
+        input.value = "";
+        sendAiPrompt(val);
+      });
+      document.getElementById("btnClearChat").addEventListener("click", () => {
+        document.getElementById("aiChatMessages").innerHTML = `<div class="ai-msg bot-msg">Đã làm mới. Hãy đặt câu hỏi mới.</div>`;
+      });
+
+      // Matrix filter tabs
+      document.querySelectorAll(".matrix-filter-tab").forEach(tab => {
+        tab.addEventListener("click", () => {
+          state.matrixFilter = tab.dataset.filter;
+          document.querySelectorAll(".matrix-filter-tab").forEach(t => t.classList.remove("active"));
+          tab.classList.add("active");
+          renderMatrixGrid();
+        });
+      });
+
+      // API Modal
+      document.getElementById("btnOpenApiModal").addEventListener("click", () => {
+        document.getElementById("geminiApiKeyInput").value = getGeminiApiKey();
+        document.getElementById("apiModal").classList.add("open");
+      });
+      document.getElementById("btnCloseApiModal").addEventListener("click", () => {
+        document.getElementById("apiModal").classList.remove("open");
+      });
+      document.getElementById("btnSaveApiKey").addEventListener("click", () => {
+        setGeminiApiKey(document.getElementById("geminiApiKeyInput").value);
+        document.getElementById("apiModal").classList.remove("open");
+        renderStats();
+        showToast(getGeminiApiKey() ? "Đã lưu Gemini API Key an toàn." : "Chế độ AI nội bộ.", "success");
+      });
+      document.getElementById("btnClearApiKey").addEventListener("click", () => {
+        document.getElementById("geminiApiKeyInput").value = "";
+        setGeminiApiKey("");
+        document.getElementById("apiModal").classList.remove("open");
+        renderStats();
+        showToast("AI Nội bộ (không cần mạng).", "info");
+      });
+
+      // Security Modal & Controls
+      document.getElementById("btnOpenSecurity").addEventListener("click", () => {
+        updateSecurityUI();
+        updateVaultUI();
+        document.getElementById("securityModal").classList.add("open");
+      });
+      document.getElementById("btnCloseSecurityModal").addEventListener("click", () => {
+        document.getElementById("securityModal").classList.remove("open");
+      });
+      document.getElementById("btnCloseSecurityModal2").addEventListener("click", () => {
+        document.getElementById("securityModal").classList.remove("open");
+      });
+      document.getElementById("btnSetVaultPin").addEventListener("click", () => {
+        const pinInput = document.getElementById("secNewPinInput");
+        setVaultPin(pinInput.value);
+        pinInput.value = "";
+      });
+      document.getElementById("btnDisableVaultPin").addEventListener("click", disableVaultPin);
+      document.getElementById("btnLockVaultNow").addEventListener("click", lockVaultNow);
+      document.getElementById("btnClearSecLogs").addEventListener("click", () => SecurityEngine.clearLogs());
+
+      // Vault Unlock Form
+      document.getElementById("vaultUnlockForm").addEventListener("submit", e => {
+        e.preventDefault();
+        const pinInput = document.getElementById("vaultUnlockPin");
+        handleUnlockVault(pinInput.value);
+        pinInput.value = "";
+      });
+
+      // Theme toggle
+      document.getElementById("btnToggleTheme").addEventListener("click", () => {
+        const isDark = document.documentElement.classList.toggle("dark");
+        document.getElementById("iconSun").style.display = isDark ? "block" : "none";
+        document.getElementById("iconMoon").style.display = isDark ? "none" : "block";
+        try { localStorage.setItem("pldc_theme_v1", isDark ? "dark" : "light"); } catch {}
+      });
+
+      // Keyboard Shortcuts
+      document.addEventListener("keydown", e => {
+        const tag = document.activeElement?.tagName?.toLowerCase();
+        if (tag === "input" || tag === "textarea") return;
+        if (state.currentScreen !== "study") return;
+        if (e.key === "ArrowRight") { e.preventDefault(); goNextQuestion(); }
+        else if (e.key === "ArrowLeft") { e.preventDefault(); goPrevQuestion(); }
+        else if (e.key.toLowerCase() === "s") { e.preventDefault(); toggleStarCurrent(); }
+        else if (e.key.toLowerCase() === "e") { e.preventDefault(); document.getElementById("btnToggleExplanation").click(); }
+        else {
+          const filtered = getFilteredQueue();
+          if (filtered.length === 0) return;
+          const q = getQuestionById(filtered[state.currentIndex]);
+          const order = getOptionOrder(q);
+          const keyMap = { "1": 0, "a": 0, "2": 1, "b": 1, "3": 2, "c": 2, "4": 3, "d": 3 };
+          const idx = keyMap[e.key.toLowerCase()];
+          if (idx !== undefined && order[idx]) {
+            e.preventDefault();
+            handleSelectOption(q, order[idx], order);
+          }
+        }
+      });
+
+      // Touch gestures
+      initSwipeGestures();
+    }
+
+    // =========================================================================
+    // 14. INITIALIZATION
+    // =========================================================================
+    (function initTheme() {
+      try {
+        const savedTheme = localStorage.getItem("pldc_theme_v1");
+        if (savedTheme === "dark") document.documentElement.classList.add("dark");
+        else if (!savedTheme && window.matchMedia?.("(prefers-color-scheme: dark)").matches) document.documentElement.classList.add("dark");
+        const isDark = document.documentElement.classList.contains("dark");
+        document.getElementById("iconSun").style.display = isDark ? "block" : "none";
+        document.getElementById("iconMoon").style.display = isDark ? "none" : "block";
+      } catch {}
+    })();
+
+    window.addEventListener("DOMContentLoaded", () => {
+      bindEvents();
+      initAppState();
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+{
+  "name": "Ôn Tập Trắc Nghiệm Thông Minh v7",
+  "short_name": "Ôn Thi v7",
+  "description": "Đọc đề Word (.docx) & PDF (.pdf), Toán OMML, Trắc nghiệm 2-8 đáp án, Đúng/Sai, Trả lời ngắn, Điền khuyết & Tự luận",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#1e293b"
+}
